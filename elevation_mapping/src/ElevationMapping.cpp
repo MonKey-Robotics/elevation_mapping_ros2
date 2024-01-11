@@ -183,7 +183,7 @@ ElevationMapping::~ElevationMapping() {
 
 bool ElevationMapping::readParameters() {
   // ElevationMapping parameters.
-  nodeHandle_->declare_parameter("point_cloud_topic");
+  nodeHandle_->declare_parameter("point_cloud_topic", std::string("/points"));
   //FIXME: Fix for case when robot pose is not defined
   nodeHandle_->declare_parameter("robot_pose_with_covariance_topic", std::string("/pose"));
   nodeHandle_->declare_parameter("track_point_frame_id", std::string("/robot"));

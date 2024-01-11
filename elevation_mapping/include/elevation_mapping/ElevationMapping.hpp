@@ -285,7 +285,7 @@ class ElevationMapping {
   boost::thread fusionServiceThread_;
 
   //! Callback group for fusion service thread.
-  rclcpp::callback_group::CallbackGroup::SharedPtr fusionServiceGroup_;
+  rclcpp::CallbackGroup::SharedPtr fusionServiceGroup_;
 
   //! Cache for the robot pose messages.
   message_filters::Cache<geometry_msgs::msg::PoseWithCovarianceStamped> robotPoseCache_;

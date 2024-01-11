@@ -304,7 +304,7 @@ This is the main Robot-Centric Elevation Mapping node. It uses the distance sens
     ```yaml
     input_sources: []
     ```
-* **`robot_pose_topic`** (string, default: "/robot_state/pose")
+* **`robot_pose_and_convariance_topic`** (string, default: "/robot_state/pose")
 
     The name of the robot pose and covariance topic.
 

@@ -133,7 +133,7 @@ bool SensorProcessorBase::updateTransformations(const rclcpp::Time& timeStamp) {
     transformationSensorToMap_ = tf2::transformToEigen(transformGeom);
 
     transformGeom = transformBuffer_->lookupTransform(generalParameters_.robotBaseFrameId_, sensorFrameId_, timeStamp,
-                                                      rclcpp::Duration(1.0));  // TODO(max): Why wrong direction?
+                                                      rclcpp::Duration::from_seconds(1.0));  // TODO(max): Why wrong direction?
     Eigen::Quaterniond rotationQuaternion;
     tf2::fromMsg(transformGeom.transform.rotation, rotationQuaternion);
     rotationBaseToSensor_.setMatrix(rotationQuaternion.toRotationMatrix());
@@ -142,7 +142,7 @@ bool SensorProcessorBase::updateTransformations(const rclcpp::Time& timeStamp) {
     translationBaseToSensorInBaseFrame_.toImplementation() = translationVector;
 
     transformGeom = transformBuffer_->lookupTransform(generalParameters_.mapFrameId_, generalParameters_.robotBaseFrameId_,
-                                                    timeStamp, rclcpp::Duration(1.0));  // TODO(max): Why wrong direction?
+                                                    timeStamp, rclcpp::Duration::from_seconds(1.0));  // TODO(max): Why wrong direction?
     tf2::fromMsg(transformGeom.transform.rotation, rotationQuaternion);
     rotationMapToBase_.setMatrix(rotationQuaternion.toRotationMatrix());
     tf2::fromMsg(transformGeom.transform.translation, translationVector);
@@ -169,7 +169,7 @@ bool SensorProcessorBase::transformPointCloud(PointCloudType::ConstPtr pointClou
 
   try {
     geometry_msgs::msg::TransformStamped transformGeom;
-    transformGeom = transformBuffer_->lookupTransform(targetFrame, inputFrameId, timeStamp, rclcpp::Duration(1.0));  // FIXME: missing 0.001 retry duration
+    transformGeom = transformBuffer_->lookupTransform(targetFrame, inputFrameId, timeStamp, rclcpp::Duration::from_seconds(1.0));  // FIXME: missing 0.001 retry duration
     Eigen::Affine3d transform = tf2::transformToEigen(transformGeom);
     pcl::transformPointCloud(*pointCloud, *pointCloudTransformed, transform.cast<float>());
     pointCloudTransformed->header.frame_id = targetFrame;
