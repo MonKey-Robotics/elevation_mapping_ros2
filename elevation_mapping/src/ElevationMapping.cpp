@@ -83,10 +83,11 @@ ElevationMapping::ElevationMapping(std::shared_ptr<rclcpp::Node>& nodeHandle) :
 
 void ElevationMapping::setupSubscribers() {  // Handle deprecated point_cloud_topic and input_sources configuration.
   auto res = nodeHandle_->get_topic_names_and_types();
+  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Setting up subscribers.");
   for (auto a:res){
     RCLCPP_INFO(nodeHandle_->get_logger(), "topic: %s", a.first.c_str());
   }
-
+  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Setting up subscribers.");
   const bool configuredInputSources = inputSources_.configureFromRos("input_sources");
   const bool hasDeprecatedPointcloudTopic = nodeHandle_->get_parameter("point_cloud_topic", pointCloudTopic_);
   if (hasDeprecatedPointcloudTopic) {
@@ -333,6 +334,7 @@ bool ElevationMapping::readParameters() {
     return false;
   }
 
+  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation mapping parameters read.");
   return true;
 }
 
@@ -537,6 +539,8 @@ void ElevationMapping::visibilityCleanupCallback() {
   RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation map is running visibility cleanup.");
   // Copy constructors for thread-safety.
   map_.visibilityCleanup(rclcpp::Time(lastPointCloudUpdateTime_));
+  if (lastPointCloudUpdateTime_ != rclcpp::Time(0)) {
+  }
 }
 
 bool ElevationMapping::fuseEntireMapServiceCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>) {

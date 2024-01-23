@@ -434,8 +434,9 @@ bool ElevationMap::clear() {
 
 void ElevationMap::visibilityCleanup(const rclcpp::Time& updatedTime) {
   // Get current time to compute calculation time.
-  const auto methodStartTime = std::chrono::system_clock::now();
+  const auto methodStartTime = nodeHandle_->get_clock()->now();
   const double timeSinceInitialization = (updatedTime - initialTime_).seconds();
+  RCLCPP_DEBUG(nodeHandle_->get_logger(), "timeSinceInitialization: %f", timeSinceInitialization);
 
   // Copy raw elevation map data for safe multi-threading.
   boost::recursive_mutex::scoped_lock scopedLockForVisibilityCleanupData(visibilityCleanupMapMutex_);
@@ -523,10 +524,10 @@ void ElevationMap::visibilityCleanup(const rclcpp::Time& updatedTime) {
   // Publish visibility cleanup map for debugging.
   publishVisibilityCleanupMap();
 
-  const std::chrono::duration<double> duration = std::chrono::system_clock::now() - methodStartTime;
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Visibility cleanup has been performed in %f s (%d points).", duration.count(), (int)cellPositionsToRemove.size());
-  if (duration.count() > visibilityCleanupDuration_) {
-    RCLCPP_WARN(nodeHandle_->get_logger(), "Visibility cleanup duration is too high (current rate is %f).", 1.0 / duration.count());
+  const rclcpp::Duration duration = nodeHandle_->get_clock()->now() - methodStartTime;
+  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Visibility cleanup has been performed in %f s (%d points).", duration.seconds(), (int)cellPositionsToRemove.size());
+  if (duration.seconds() > visibilityCleanupDuration_) {
+    RCLCPP_WARN(nodeHandle_->get_logger(), "Visibility cleanup duration is too high (current rate is %f).", 1.0 / duration.seconds());
   }
 }
 

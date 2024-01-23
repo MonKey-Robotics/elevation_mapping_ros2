@@ -14,12 +14,12 @@
 
   <depend>boost</depend>
   <depend>eigen</depend>
-  <depend>pcl</depend>
+  <!-- <depend>pcl</depend> -->
   <!-- <depend>eigen_conversions</depend> probably not necessary -->
   <depend>grid_map_core</depend>
   <depend>grid_map_ros</depend>
   <depend>grid_map_msgs</depend>
-  <depend>kindr</depend>
+  <!-- <depend>kindr</depend> -->
   <depend>kindr_ros</depend>
   <depend>message_filters</depend>
   <depend>pcl_ros</depend>
