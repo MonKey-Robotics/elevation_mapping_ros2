@@ -128,8 +128,10 @@ void ElevationMapping::setupServices() {
 }
 
 void ElevationMapping::setupTimers() {
-  // TODO: mapUpdateTimer_ is originally single shot and autostart is set to false
-  // mapUpdateTimer_ = rclcpp::create_timer(nodeHandle_, nodeHandle_->get_clock(), maxNoUpdateDuration_, &ElevationMapping::mapUpdateTimerCallback);
+  mapUpdateTimer_ = rclcpp::create_timer(
+    nodeHandle_, nodeHandle_->get_clock(), maxNoUpdateDuration_, 
+    std::bind(&ElevationMapping::mapUpdateTimerCallback, this));
+  mapUpdateTimer_->cancel();
 
   // if (fusedMapPublishTimerDuration_.seconds() != 0.0) {
   //   ros::TimerOptions timerOptions =
@@ -340,7 +342,7 @@ bool ElevationMapping::initialize() {
 
   //fusionServiceThread_ = std::thread(boost::bind(&ElevationMapping::runFusionServiceThread, this));
   rclcpp::sleep_for(std::chrono::seconds(1));  // Need this to get the TF caches fill up.
-  // resetMapUpdateTimer();
+  resetMapUpdateTimer();
   // fusedMapPublishTimer_.start();
   // visibilityCleanupThread_ = boost::thread(boost::bind(&ElevationMapping::visibilityCleanupThread, this));
   visibilityCleanupTimer_.reset(); 
@@ -440,7 +442,7 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
       return;
     }
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Point cloud could not be processed."); //TODO: what causes this issue
-    // resetMapUpdateTimer();
+    resetMapUpdateTimer();
     return;
   }
 
@@ -452,7 +454,7 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
   // Update map from motion prediction.
   if (!updatePrediction(lastPointCloudUpdateTime_)) {
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Updating process noise failed.");
-    // resetMapUpdateTimer();
+    resetMapUpdateTimer();
     return;
   }
 
@@ -466,7 +468,7 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
   if (!map_.add(pointCloudProcessed, measurementVariances, lastPointCloudUpdateTime_,
                 Eigen::Affine3d(sensorProcessor_->transformationSensorToMap_))) {
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Adding point cloud to elevation map failed.");
-    // resetMapUpdateTimer();
+    resetMapUpdateTimer();
     return;
   }
 
@@ -480,7 +482,7 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
     }
   }
 
-  // resetMapUpdateTimer();
+  resetMapUpdateTimer();
 }
 
 void ElevationMapping::mapUpdateTimerCallback() {
@@ -506,7 +508,7 @@ void ElevationMapping::mapUpdateTimerCallback() {
   // Update map from motion prediction.
   if (!updatePrediction(time)) {
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Updating process noise failed.");
-    // resetMapUpdateTimer();
+    resetMapUpdateTimer();
     return;
   }
 
@@ -517,7 +519,7 @@ void ElevationMapping::mapUpdateTimerCallback() {
     map_.publishFusedElevationMap();
   }
 
-  // resetMapUpdateTimer();
+  resetMapUpdateTimer();
 }
 
 void ElevationMapping::publishFusedMapCallback() {
@@ -817,18 +819,18 @@ bool ElevationMapping::loadMapServiceCallback(std::shared_ptr<grid_map_msgs::srv
   return static_cast<bool>(response->success);
 }
 
-// void ElevationMapping::resetMapUpdateTimer() {
-//   mapUpdateTimer_->cancel();
-//   rclcpp::Duration periodSinceLastUpdate = nodeHandle_->get_clock()->now() - map_.getTimeOfLastUpdate();
-//   if (periodSinceLastUpdate > maxNoUpdateDuration_) {
-//     periodSinceLastUpdate = rclcpp::Duration::from_seconds(0.0);
-//   }
-//   mapUpdateTimer_.setPeriod(maxNoUpdateDuration_ - periodSinceLastUpdate);
-//   mapUpdateTimer_.start();
-// }
+void ElevationMapping::resetMapUpdateTimer() {
+  mapUpdateTimer_->reset();
+  // rclcpp::Duration periodSinceLastUpdate = nodeHandle_->get_clock()->now() - map_.getTimeOfLastUpdate();
+  // if (periodSinceLastUpdate > maxNoUpdateDuration_) {
+  //   periodSinceLastUpdate = rclcpp::Duration::from_seconds(0.0);
+  // }
+  // mapUpdateTimer_->setPeriod(maxNoUpdateDuration_ - periodSinceLastUpdate);
+  // mapUpdateTimer_->start();
+}
 
-// void ElevationMapping::stopMapUpdateTimer() {
-//   mapUpdateTimer_->cancel();
-// }
+void ElevationMapping::stopMapUpdateTimer() {
+  mapUpdateTimer_->cancel();
+}
 
 }  // namespace elevation_mapping
