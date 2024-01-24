@@ -436,7 +436,6 @@ void ElevationMap::visibilityCleanup(const rclcpp::Time& updatedTime) {
   // Get current time to compute calculation time.
   const auto methodStartTime = nodeHandle_->get_clock()->now();
   const double timeSinceInitialization = (updatedTime - initialTime_).seconds();
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "timeSinceInitialization: %f", timeSinceInitialization);
 
   // Copy raw elevation map data for safe multi-threading.
   boost::recursive_mutex::scoped_lock scopedLockForVisibilityCleanupData(visibilityCleanupMapMutex_);

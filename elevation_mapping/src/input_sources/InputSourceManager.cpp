@@ -14,18 +14,18 @@ namespace elevation_mapping {
 InputSourceManager::InputSourceManager(const std::shared_ptr<rclcpp::Node>& nodeHandle) : nodeHandle_(nodeHandle) {}
 
 bool InputSourceManager::configureFromRos(const std::string& inputSourcesNamespace) {
-  nodeHandle_->declare_parameter(inputSourcesNamespace);
+  nodeHandle_->declare_parameter(inputSourcesNamespace, std::vector<std::string>());
 
   // Configure the visualizations from a configuration stored on the parameter server.
   std::vector<std::string> inputSourcesConfiguration = nodeHandle_->get_parameter(inputSourcesNamespace).as_string_array();
-  // if (!nodeHandle_->get_parameter(inputSourcesNamespace, inputSourcesConfiguration)) {
-  //   RCLCPP_WARN(nodeHandle_->get_logger(),
-  //       "Could not load the input sources configuration from parameter\n "
-  //       "%s, are you sure it was pushed to the parameter server? Assuming\n "
-  //       "that you meant to leave it empty. Not subscribing to any inputs!\n",
-  //       inputSourcesNamespace.c_str());
-  //   return false;
-  // }
+  if (!nodeHandle_->get_parameter(inputSourcesNamespace, inputSourcesConfiguration)) {
+    RCLCPP_WARN(nodeHandle_->get_logger(),
+        "Could not load the input sources configuration from parameter\n "
+        "%s, are you sure it was pushed to the parameter server? Assuming\n "
+        "that you meant to leave it empty. Not subscribing to any inputs!\n",
+        inputSourcesNamespace.c_str());
+    return false;
+  }
   return configure(inputSourcesConfiguration, inputSourcesNamespace);  
 }
 
@@ -33,8 +33,6 @@ bool InputSourceManager::configure(const std::vector<std::string>& config, const
   if (config.size() == 0) {  // Use Empty array as special case to explicitly configure no inputs.
     return true;
   }
-
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Configuring input sources from %s", sourceConfigurationName.c_str());
  
   bool successfulConfiguration = true;
   std::set<std::string> subscribedTopics;
