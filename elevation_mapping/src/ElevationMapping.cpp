@@ -97,7 +97,6 @@ void ElevationMapping::setupSubscribers() {  // Handle deprecated point_cloud_to
   }*/       
   if (configuredInputSources) {
     inputSources_.registerCallbacks(*this, std::make_pair("pointcloud", &ElevationMapping::pointCloudCallback));
-    // inputSources_.registerCallbacks(*this, std::make_pair("pointcloud", pointCloudCallback));
   } else {
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Input sources not configured!");
   }
@@ -145,7 +144,7 @@ void ElevationMapping::setupTimers() {
     visibilityCleanupTimer_ = rclcpp::create_timer(
       nodeHandle_, nodeHandle_->get_clock(), visibilityCleanupTimerDuration_,
       std::bind(&ElevationMapping::visibilityCleanupCallback, this));
-    visibilityCleanupTimer_->cancel(); 
+    visibilityCleanupTimer_->cancel();
   }
 }
 
@@ -345,7 +344,7 @@ bool ElevationMapping::initialize() {
   resetMapUpdateTimer();
   // fusedMapPublishTimer_.start();
   // visibilityCleanupThread_ = boost::thread(boost::bind(&ElevationMapping::visibilityCleanupThread, this));
-  visibilityCleanupTimer_.reset(); 
+  visibilityCleanupTimer_->reset(); 
   initializeElevationMap();
   return true;
 }
@@ -400,7 +399,7 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
     }
   }
 
-  // stopMapUpdateTimer();
+  stopMapUpdateTimer();
 
   // Convert the sensor_msgs/PointCloud2 data to pcl/PointCloud.
   // TODO(max): Double check with http://wiki.ros.org/hydro/Migration
@@ -486,6 +485,7 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
 }
 
 void ElevationMapping::mapUpdateTimerCallback() {
+
   if (!updatesEnabled_) {
     rclcpp::Clock clock;
     RCLCPP_WARN_THROTTLE(nodeHandle_->get_logger(), clock, 10, "Updating of elevation map is disabled. (Warning message is throttled, 10s.)");
@@ -503,7 +503,7 @@ void ElevationMapping::mapUpdateTimerCallback() {
 
   boost::recursive_mutex::scoped_lock scopedLock(map_.getRawDataMutex());
 
-  // stopMapUpdateTimer();
+  stopMapUpdateTimer();
 
   // Update map from motion prediction.
   if (!updatePrediction(time)) {
