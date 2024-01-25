@@ -20,10 +20,10 @@ int main(int argc, char** argv) {
   elevation_mapping::ElevationMapping elevationMap(nodeHandle);  
 
   // Spin
-  // rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), nodeHandle->get_parameter("num_callback_threads").as_int());
-  // executor.add_node(nodeHandle);
-  // executor.spin();
-  rclcpp::spin(nodeHandle);
-  rclcpp::shutdown();  
+  rclcpp::executors::MultiThreadedExecutor executor;
+  executor.add_node(nodeHandle);
+  executor.spin();
+  // rclcpp::spin(nodeHandle);
+  // rclcpp::shutdown();  
   return 0;
 }

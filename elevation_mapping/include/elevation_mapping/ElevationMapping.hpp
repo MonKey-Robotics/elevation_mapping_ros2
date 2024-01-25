@@ -28,9 +28,6 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-// Boost
-#include <boost/thread.hpp>
-
 // Elevation Mapping
 #include "elevation_mapping/ElevationMap.hpp"
 #include "elevation_mapping/PointXYZRGBConfidenceRatio.hpp"
@@ -215,16 +212,6 @@ class ElevationMapping {
   void setupTimers();
 
   /*!
-   * Separate thread for all fusion service calls.
-   */
-  void runFusionServiceThread();
-
-  /*!
-   * Separate thread for visibility cleanup.
-   */
-  void visibilityCleanupThread();
-
-  /*!
    * Update the elevation map from the robot motion up to a certain time.
    *
    * @param time    Time to which the map is updated to.
@@ -239,16 +226,6 @@ class ElevationMapping {
    * @return true if successful.
    */
   bool updateMapLocation();
-
-  /*!
-   * Reset and start the map update timer.
-   */
-  void resetMapUpdateTimer();
-
-  /*!
-   * Stop the map update timer.
-   */
-  void stopMapUpdateTimer();
 
   /*!
    * Initializes a submap around the robot of the elevation map with a constant height.
@@ -280,9 +257,6 @@ class ElevationMapping {
   rclcpp::Service<grid_map_msgs::srv::SetGridMap>::SharedPtr maskedReplaceService_;
   rclcpp::Service<grid_map_msgs::srv::ProcessFile>::SharedPtr saveMapService_;
   rclcpp::Service<grid_map_msgs::srv::ProcessFile>::SharedPtr loadMapService_;
-
-  //! Callback thread for the fusion services.
-  boost::thread fusionServiceThread_;
 
   //! Callback group for fusion service thread.
   rclcpp::CallbackGroup::SharedPtr fusionServiceGroup_;
@@ -351,11 +325,8 @@ class ElevationMapping {
   //! Duration for the raytracing cleanup timer.
   rclcpp::Duration visibilityCleanupTimerDuration_;
 
-  //! Callback qroup for raytracing cleanup thread.
+  //! Callback group for raytracing cleanup thread.
   rclcpp::CallbackGroup::SharedPtr visibilityCleanupGroup_;
-
-  //! Callback thread for raytracing cleanup.
-  boost::thread visibilityCleanupThread_;
 
   //! Becomes true when corresponding poses and point clouds can be found
   bool receivedFirstMatchingPointcloudAndPose_;
