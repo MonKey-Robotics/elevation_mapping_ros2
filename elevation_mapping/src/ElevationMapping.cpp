@@ -66,7 +66,7 @@ ElevationMapping::ElevationMapping(std::shared_ptr<rclcpp::Node>& nodeHandle) :
 
   readParameters();
   setupSubscribers();
-  setupServices();
+  // setupServices();
   setupTimers();
 
   transformBuffer_ = std::make_shared<tf2_ros::Buffer>(nodeHandle_->get_clock());
@@ -476,17 +476,18 @@ void ElevationMapping::mapUpdateTimerCallback() {
 }
 
 void ElevationMapping::publishFusedMapCallback() {
-  if (!map_.hasFusedMapSubscribers()) {
-    return;
-  }
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation map is fused and published from timer.");
+  // if (!map_.hasFusedMapSubscribers()) {
+  //   return;
+  // }
+  RCLCPP_INFO(nodeHandle_->get_logger(), "!!!!!! Elevation map is fused and published from timer.");
   std::unique_lock<std::recursive_mutex> scopedLock(map_.getFusedDataMutex());
   map_.fuseAll();
   map_.publishFusedElevationMap();
 }
 
 void ElevationMapping::visibilityCleanupCallback() {
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation map is running visibility cleanup.");
+
+  RCLCPP_INFO(nodeHandle_->get_logger(), "Elevation map is running visibility cleanup.");
   // Copy constructors for thread-safety.x
   map_.visibilityCleanup(rclcpp::Time(lastPointCloudUpdateTime_));
 }
