@@ -14,7 +14,8 @@
 #include <grid_map_msgs/srv/set_grid_map.hpp>
 
 // ROS
-#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/pose_with_covariance.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <message_filters/cache.h>
 #include <message_filters/subscriber.h>
 #include <rclcpp/rclcpp.hpp>
@@ -206,7 +207,7 @@ class ElevationMapping {
   InputSourceManager inputSources_;
   //! ROS subscribers.  
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointCloudSubscriber_;  //!< Deprecated, use input_source instead.
-  message_filters::Subscriber<geometry_msgs::msg::PoseWithCovarianceStamped> robotPoseSubscriber_;
+  message_filters::Subscriber<nav_msgs::msg::Odometry> robotOdomSubscriber_;
 
   //! ROS service servers.
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr enableUpdatesService_;
@@ -217,10 +218,10 @@ class ElevationMapping {
   rclcpp::Service<grid_map_msgs::srv::ProcessFile>::SharedPtr loadMapService_;
 
   //! Cache for the robot pose messages.
-  message_filters::Cache<geometry_msgs::msg::PoseWithCovarianceStamped> robotPoseCache_;
+  message_filters::Cache<nav_msgs::msg::Odometry> robotOdomCache_;
 
   //! Size of the cache for the robot pose messages.
-  int robotPoseCacheSize_;
+  int robotOdomCacheSize_;
 
   //! Frame ID of the elevation map
   std::string mapFrameId_;
@@ -235,7 +236,7 @@ class ElevationMapping {
 
   //! ROS topics for subscriptions.
   std::string pointCloudTopic_;  //!< Deprecated, use input_source instead.
-  std::string robotPoseTopic_;
+  std::string robotOdomTopic_;
 
   //! Elevation map.
   ElevationMap map_;
