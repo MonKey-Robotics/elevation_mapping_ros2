@@ -37,7 +37,6 @@ ElevationMap::ElevationMap(std::shared_ptr<rclcpp::Node> nodeHandle)
     : nodeHandle_(nodeHandle),
       rawMap_({"elevation", "variance", "horizontal_variance_x", "horizontal_variance_y", "horizontal_variance_xy", "color", "time",
                "dynamic_time", "lowest_scan_point", "sensor_x_at_lowest_scan", "sensor_y_at_lowest_scan", "sensor_z_at_lowest_scan"}),
-      fusedMap_({"elevation", "upper_bound", "lower_bound", "color"}),
       // FIXME: Postprocessor num threads should be same as number of filters
       postprocessorPool_(nodeHandle_->get_parameter("postprocessor_num_threads").as_int(), nodeHandle_),
       hasUnderlyingMap_(false),
@@ -52,10 +51,8 @@ ElevationMap::ElevationMap(std::shared_ptr<rclcpp::Node> nodeHandle)
       visibilityCleanupDuration_(0.0),
       scanningDuration_(1.0) {
   rawMap_.setBasicLayers({"elevation", "variance"});
-  fusedMap_.setBasicLayers({"elevation", "upper_bound", "lower_bound"});
   clear();
 
-  elevationMapFusedPublisher_ = nodeHandle_->create_publisher<grid_map_msgs::msg::GridMap>("elevation_map", 1);
   if (!underlyingMapTopic_.empty()) {
     underlyingMapSubscriber_ = nodeHandle_->create_subscription<grid_map_msgs::msg::GridMap>(underlyingMapTopic_, 1, std::bind(&ElevationMap::underlyingMapCallback, this, std::placeholders::_1));
   }
@@ -69,9 +66,7 @@ ElevationMap::~ElevationMap() = default;
 
 void ElevationMap::setGeometry(const grid_map::Length& length, const double& resolution, const grid_map::Position& position) {
   std::unique_lock<std::recursive_mutex> scopedLockForRawData(rawMapMutex_);
-  std::unique_lock<std::recursive_mutex> scopedLockForFusedData(fusedMapMutex_);
   rawMap_.setGeometry(length, resolution, position);
-  fusedMap_.setGeometry(length, resolution, position);
   RCLCPP_INFO_STREAM(nodeHandle_->get_logger(), "Elevation map grid resized to " << rawMap_.getSize()(0) << " rows and " << rawMap_.getSize()(1) << " columns.");
 }
 
@@ -225,197 +220,6 @@ bool ElevationMap::update(const grid_map::Matrix& varianceUpdate, const grid_map
   return true;
 }
 
-bool ElevationMap::fuseAll() {
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Requested to fuse entire elevation map.");
-  std::unique_lock<std::recursive_mutex> scopedLock(fusedMapMutex_);
-  return fuse(grid_map::Index(0, 0), fusedMap_.getSize());
-}
-
-bool ElevationMap::fuseArea(const Eigen::Vector2d& position, const Eigen::Array2d& length) {
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Requested to fuse an area of the elevation map with center at (%f, %f) and side lengths (%f, %f)", position[0], position[1],
-            length[0], length[1]);
-
-  grid_map::Index topLeftIndex;
-  grid_map::Index submapBufferSize;
-
-  // These parameters are not used in this function.
-  grid_map::Position submapPosition;
-  grid_map::Length submapLength;
-  grid_map::Index requestedIndexInSubmap;
-
-  std::unique_lock<std::recursive_mutex> scopedLock(fusedMapMutex_);
-
-  grid_map::getSubmapInformation(topLeftIndex, submapBufferSize, submapPosition, submapLength, requestedIndexInSubmap, position, length,
-                                 rawMap_.getLength(), rawMap_.getPosition(), rawMap_.getResolution(), rawMap_.getSize(),
-                                 rawMap_.getStartIndex());
-
-  return fuse(topLeftIndex, submapBufferSize);
-}
-
-bool ElevationMap::fuse(const grid_map::Index& topLeftIndex, const grid_map::Index& size) {
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Fusing elevation map...");
-
-  // Nothing to do.
-  if ((size == 0).any()) {
-    return false;
-  }
-
-  // Initializations.
-  const auto methodStartTime = std::chrono::system_clock::now();  
-
-  // Copy raw elevation map data for safe multi-threading.
-  std::unique_lock<std::recursive_mutex> scopedLockForRawData(rawMapMutex_);
-  auto rawMapCopy = rawMap_;
-  scopedLockForRawData.unlock();
-
-  std::unique_lock<std::recursive_mutex> scopedLock(fusedMapMutex_);
-
-  // More initializations.
-  const double halfResolution = fusedMap_.getResolution() / 2.0;
-  const float minimalWeight = std::numeric_limits<float>::epsilon() * static_cast<float>(2.0);
-  // Conservative cell inclusion for ellipse iterator.
-  const double ellipseExtension = M_SQRT2 * fusedMap_.getResolution();
-
-  // Check if there is the need to reset out-dated data.
-  if (fusedMap_.getTimestamp() != rawMapCopy.getTimestamp()) {
-    resetFusedData();
-  }
-
-  // Align fused map with raw map.
-  if (rawMapCopy.getPosition() != fusedMap_.getPosition()) {
-    fusedMap_.move(rawMapCopy.getPosition());
-  }
-
-  // For each cell in requested area.
-  for (grid_map::SubmapIterator areaIterator(rawMapCopy, topLeftIndex, size); !areaIterator.isPastEnd(); ++areaIterator) {
-    // Check if fusion for this cell has already been done earlier.
-    if (fusedMap_.isValid(*areaIterator)) {
-      continue;
-    }
-
-    if (!rawMapCopy.isValid(*areaIterator)) {
-      // This is an empty cell (hole in the map).
-      // TODO(max):
-      continue;
-    }
-
-    // Get size of error ellipse.
-    const float& sigmaXsquare = rawMapCopy.at("horizontal_variance_x", *areaIterator);
-    const float& sigmaYsquare = rawMapCopy.at("horizontal_variance_y", *areaIterator);
-    const float& sigmaXYsquare = rawMapCopy.at("horizontal_variance_xy", *areaIterator);
-
-    Eigen::Matrix2d covarianceMatrix;
-    covarianceMatrix << sigmaXsquare, sigmaXYsquare, sigmaXYsquare, sigmaYsquare;
-    // 95.45% confidence ellipse which is 2.486-sigma for 2 dof problem.
-    // http://www.reid.ai/2012/09/chi-squared-distribution-table-with.html
-    const double uncertaintyFactor = 2.486;  // sqrt(6.18)
-    Eigen::EigenSolver<Eigen::Matrix2d> solver(covarianceMatrix);
-    Eigen::Array2d eigenvalues(solver.eigenvalues().real().cwiseAbs());
-
-    Eigen::Array2d::Index maxEigenvalueIndex;
-    eigenvalues.maxCoeff(&maxEigenvalueIndex);
-    Eigen::Array2d::Index minEigenvalueIndex;
-    maxEigenvalueIndex == Eigen::Array2d::Index(0) ? minEigenvalueIndex = 1 : minEigenvalueIndex = 0;
-    const grid_map::Length ellipseLength =
-        2.0 * uncertaintyFactor * grid_map::Length(eigenvalues(maxEigenvalueIndex), eigenvalues(minEigenvalueIndex)).sqrt() +
-        ellipseExtension;
-    const double ellipseRotation(
-        atan2(solver.eigenvectors().col(maxEigenvalueIndex).real()(1), solver.eigenvectors().col(maxEigenvalueIndex).real()(0)));
-
-    // Requested length and position (center) of submap in map.
-    grid_map::Position requestedSubmapPosition;
-    rawMapCopy.getPosition(*areaIterator, requestedSubmapPosition);
-    grid_map::EllipseIterator ellipseIterator(rawMapCopy, requestedSubmapPosition, ellipseLength, ellipseRotation);
-
-    // Prepare data fusion.
-    Eigen::ArrayXf means, weights;
-    const unsigned int maxNumberOfCellsToFuse = ellipseIterator.getSubmapSize().prod();
-    means.resize(maxNumberOfCellsToFuse);
-    weights.resize(maxNumberOfCellsToFuse);
-    WeightedEmpiricalCumulativeDistributionFunction<float> lowerBoundDistribution;
-    WeightedEmpiricalCumulativeDistributionFunction<float> upperBoundDistribution;
-
-    float maxStandardDeviation = sqrt(eigenvalues(maxEigenvalueIndex));
-    float minStandardDeviation = sqrt(eigenvalues(minEigenvalueIndex));
-    Eigen::Rotation2Dd rotationMatrix(ellipseRotation);
-    std::string maxEigenvalueLayer, minEigenvalueLayer;
-    if (maxEigenvalueIndex == 0) {
-      maxEigenvalueLayer = "horizontal_variance_x";
-      minEigenvalueLayer = "horizontal_variance_y";
-    } else {
-      maxEigenvalueLayer = "horizontal_variance_y";
-      minEigenvalueLayer = "horizontal_variance_x";
-    }
-
-    // For each cell in error ellipse.
-    size_t i = 0;
-    for (; !ellipseIterator.isPastEnd(); ++ellipseIterator) {
-      if (!rawMapCopy.isValid(*ellipseIterator)) {
-        // Empty cell in submap (cannot be center cell because we checked above).
-        continue;
-      }
-
-      means[i] = rawMapCopy.at("elevation", *ellipseIterator);
-
-      // Compute weight from probability.
-      grid_map::Position absolutePosition;
-      rawMapCopy.getPosition(*ellipseIterator, absolutePosition);
-      Eigen::Vector2d distanceToCenter = (rotationMatrix * (absolutePosition - requestedSubmapPosition)).cwiseAbs();
-
-      float probability1 = cumulativeDistributionFunction(distanceToCenter.x() + halfResolution, 0.0, maxStandardDeviation) -
-                           cumulativeDistributionFunction(distanceToCenter.x() - halfResolution, 0.0, maxStandardDeviation);
-      float probability2 = cumulativeDistributionFunction(distanceToCenter.y() + halfResolution, 0.0, minStandardDeviation) -
-                           cumulativeDistributionFunction(distanceToCenter.y() - halfResolution, 0.0, minStandardDeviation);
-
-      const float weight = std::max(minimalWeight, probability1 * probability2);
-      weights[i] = weight;
-      const float standardDeviation = sqrt(rawMapCopy.at("variance", *ellipseIterator));
-      lowerBoundDistribution.add(means[i] - 2.0 * standardDeviation, weight);
-      upperBoundDistribution.add(means[i] + 2.0 * standardDeviation, weight);
-
-      i++;
-    }
-
-    if (i == 0) {
-      // Nothing to fuse.
-      fusedMap_.at("elevation", *areaIterator) = rawMapCopy.at("elevation", *areaIterator);
-      fusedMap_.at("lower_bound", *areaIterator) =
-          rawMapCopy.at("elevation", *areaIterator) - 2.0 * sqrt(rawMapCopy.at("variance", *areaIterator));
-      fusedMap_.at("upper_bound", *areaIterator) =
-          rawMapCopy.at("elevation", *areaIterator) + 2.0 * sqrt(rawMapCopy.at("variance", *areaIterator));
-      fusedMap_.at("color", *areaIterator) = rawMapCopy.at("color", *areaIterator);
-      continue;
-    }
-
-    // Fuse.
-    means.conservativeResize(i);
-    weights.conservativeResize(i);
-
-    float mean = (weights * means).sum() / weights.sum();
-
-    if (!std::isfinite(mean)) {
-      RCLCPP_ERROR(nodeHandle_->get_logger(), "Something went wrong when fusing the map: Mean = %f", mean);
-      continue;
-    }
-
-    // Add to fused map.
-    fusedMap_.at("elevation", *areaIterator) = mean;
-    lowerBoundDistribution.compute();
-    upperBoundDistribution.compute();
-    fusedMap_.at("lower_bound", *areaIterator) = lowerBoundDistribution.quantile(0.01);  // TODO(max):
-    fusedMap_.at("upper_bound", *areaIterator) = upperBoundDistribution.quantile(0.99);  // TODO(max):
-    // TODO(max): Add fusion of colors.
-    fusedMap_.at("color", *areaIterator) = rawMapCopy.at("color", *areaIterator);
-  }
-
-  fusedMap_.setTimestamp(rawMapCopy.getTimestamp());
-
-  const std::chrono::duration<double> duration = std::chrono::system_clock::now() - methodStartTime;
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation map has been fused in %f s.", duration.count());
-
-  return true;
-}
-
 bool ElevationMap::clear() {
   // Lock raw and fused map object in different scopes to prevent deadlock.
   {
@@ -423,11 +227,6 @@ bool ElevationMap::clear() {
     rawMap_.clearAll();
     rawMap_.resetTimestamp();
     rawMap_.get("dynamic_time").setZero();
-  }
-  {
-    std::unique_lock<std::recursive_mutex> scopedLockForFusedData(fusedMapMutex_);
-    fusedMap_.clearAll();
-    fusedMap_.resetTimestamp();
   }
   return true;
 }
@@ -557,21 +356,6 @@ bool ElevationMap::postprocessAndPublishRawElevationMap() {
   return postprocessorPool_.runTask(rawMapCopy);
 }
 
-bool ElevationMap::publishFusedElevationMap() {
-  if (!hasFusedMapSubscribers()) {
-    return false;
-  }
-  std::unique_lock<std::recursive_mutex> scopedLock(fusedMapMutex_);
-  grid_map::GridMap fusedMapCopy = fusedMap_;
-  scopedLock.unlock();
-  fusedMapCopy.add("uncertainty_range", fusedMapCopy.get("upper_bound") - fusedMapCopy.get("lower_bound"));
-  std::unique_ptr<grid_map_msgs::msg::GridMap> message;
-  message = grid_map::GridMapRosConverter::toMessage(fusedMapCopy);
-  elevationMapFusedPublisher_->publish(std::move(message));
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation map (fused) has been published.");
-  return true;
-}
-
 bool ElevationMap::publishVisibilityCleanupMap() {
   if (visibilityCleanupMapPublisher_->get_subscription_count() < 1) {
     return false;
@@ -602,22 +386,8 @@ void ElevationMap::setRawGridMap(const grid_map::GridMap& map) {
   rawMap_ = map;
 }
 
-grid_map::GridMap& ElevationMap::getFusedGridMap() {
-  return fusedMap_;
-}
-
-void ElevationMap::setFusedGridMap(const grid_map::GridMap& map) {
-  std::unique_lock<std::recursive_mutex> scopedLockForFusedData(fusedMapMutex_);
-  fusedMap_ = map;
-}
-
 rclcpp::Time ElevationMap::getTimeOfLastUpdate() {
   return rclcpp::Time(rawMap_.getTimestamp(), RCL_ROS_TIME);
-}
-
-rclcpp::Time ElevationMap::getTimeOfLastFusion() {
-  std::unique_lock<std::recursive_mutex> scopedLock(fusedMapMutex_);
-  return rclcpp::Time(fusedMap_.getTimestamp(), RCL_ROS_TIME);
 }
 
 const kindr::HomTransformQuatD& ElevationMap::getPose() {
@@ -633,10 +403,6 @@ bool ElevationMap::getPosition3dInRobotParentFrame(const Eigen::Array2i& index, 
   return true;
 }
 
-std::recursive_mutex& ElevationMap::getFusedDataMutex() {
-  return fusedMapMutex_;
-}
-
 std::recursive_mutex& ElevationMap::getRawDataMutex() {
   return rawMapMutex_;
 }
@@ -649,12 +415,6 @@ bool ElevationMap::clean() {
   rawMap_.get("horizontal_variance_y") =
       rawMap_.get("horizontal_variance_y").unaryExpr(VarianceClampOperator<float>(minHorizontalVariance_, maxHorizontalVariance_));
   return true;
-}
-
-void ElevationMap::resetFusedData() {
-  std::unique_lock<std::recursive_mutex> scopedLockForFusedData(fusedMapMutex_);
-  fusedMap_.clearAll();
-  fusedMap_.resetTimestamp();
 }
 
 void ElevationMap::setFrameId(const std::string& frameId) {
@@ -675,9 +435,6 @@ bool ElevationMap::hasRawMapSubscribers() const {
   return postprocessorPool_.pipelineHasSubscribers();
 }
 
-bool ElevationMap::hasFusedMapSubscribers() const {
-  return elevationMapFusedPublisher_->get_subscription_count() >= 1;
-}
 
 void ElevationMap::underlyingMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr underlyingMap) {
   RCLCPP_INFO(nodeHandle_->get_logger(), "Updating underlying map.");

@@ -75,20 +75,6 @@ class ElevationMap {
               const grid_map::Matrix& horizontalVarianceUpdateY, const grid_map::Matrix& horizontalVarianceUpdateXY, const rclcpp::Time& time);
 
   /*!
-   * Triggers the fusion of the entire elevation map.
-   * @return true if successful.
-   */
-  bool fuseAll();
-
-  /*!
-   * Fuses the elevation map for a certain rectangular area.
-   * @param position the center position of the area to fuse.
-   * @param length the sides lengths of the area to fuse.
-   * @return true if successful.
-   */
-  bool fuseArea(const Eigen::Vector2d& position, const Eigen::Array2d& length);
-
-  /*!
    * Clears all data of the elevation map (data and time).
    * @return true if successful.
    */
@@ -115,13 +101,6 @@ class ElevationMap {
   bool postprocessAndPublishRawElevationMap();
 
   /*!
-   * Publishes the fused elevation map. Takes the latest available fused elevation
-   * map, does not trigger the fusion process.
-   * @return true if successful.
-   */
-  bool publishFusedElevationMap();
-
-  /*!
    * Publishes the (latest) visibility cleanup map.
    * @return true if successful.
    */
@@ -138,18 +117,6 @@ class ElevationMap {
    * @param map The input raw grid map to set.
    */
   void setRawGridMap(const grid_map::GridMap& map);
-
-  /*!
-   * Gets a reference to the fused grid map.
-   * @return the fused grid map.
-   */
-  grid_map::GridMap& getFusedGridMap();
-
-  /*!
-   * Sets a fused grid map.
-   * @param map The input fused grid map to set.
-   */
-  void setFusedGridMap(const grid_map::GridMap& map);
 
   /*!
    * Gets the time of last map update.
@@ -215,12 +182,6 @@ class ElevationMap {
   bool hasRawMapSubscribers() const;
 
   /*!
-   * If the fused elevation map has subscribers.
-   * @return true if number of subscribers bigger then 0.
-   */
-  bool hasFusedMapSubscribers() const;
-
-  /*!
    * Callback method for the updates of the underlying map.
    * Updates the internal underlying map.
    * @param underlyingMap the underlying map.
@@ -256,12 +217,6 @@ class ElevationMap {
   bool clean();
 
   /*!
-   * Resets the fused map data.
-   * @return true if successful.
-   */
-  void resetFusedData();
-
-  /*!
    * Cumulative distribution function.
    * @param x the argument value.
    * @param mean the mean of the distribution.
@@ -295,11 +250,7 @@ class ElevationMap {
   kindr::HomTransformQuatD pose_;
 
   //! ROS publishers. Publishing of the raw elevation map is handled by the postprocessing pool.
-  rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr elevationMapFusedPublisher_;
   rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr visibilityCleanupMapPublisher_;
-
-  //! Mutex lock for fused map.
-  std::recursive_mutex fusedMapMutex_;
 
   //! Mutex lock for raw map.
   std::recursive_mutex rawMapMutex_;

@@ -77,45 +77,10 @@ class ElevationMapping {
   void mapUpdateTimerCallback();
 
   /*!
-   * Callback function for the fused map publish timer. Publishes the fused map
-   * based on configurable duration.
-   *
-   */
-  void publishFusedMapCallback();
-
-  /*!
    * Callback function for cleaning map based on visibility ray tracing.
    *
    */
   void visibilityCleanupCallback();
-
-  /*!
-   * ROS service callback function to trigger the fusion of the entire
-   * elevation map.
-   *
-   * @param request     The ROS service request.
-   * @param response    The ROS service response.
-   * @return true if successful.
-   */
-  bool fuseEntireMapServiceCallback(const std::shared_ptr<rmw_request_id_t>, const std::shared_ptr<std_srvs::srv::Empty::Request>, std::shared_ptr<std_srvs::srv::Empty::Response>);
-
-  /*!
-   * ROS service callback function to return a submap of the fused elevation map.
-   *
-   * @param request     The ROS service request defining the location and size of the fused submap.
-   * @param response    The ROS service response containing the requested fused submap.
-   * @return true if successful.
-   */
-  bool getFusedSubmapServiceCallback(std::shared_ptr<grid_map_msgs::srv::GetGridMap::Request> request, std::shared_ptr<grid_map_msgs::srv::GetGridMap::Response> response);
-
-  /*!
-   * ROS service callback function to return a submap of the raw elevation map.
-   *
-   * @param request     The ROS service request defining the location and size of the raw submap.
-   * @param response    The ROS service response containing the requested raw submap.
-   * @return true if successful.
-   */
-  bool getRawSubmapServiceCallback(std::shared_ptr<grid_map_msgs::srv::GetGridMap::Request> request, std::shared_ptr<grid_map_msgs::srv::GetGridMap::Response> response);
 
   /*!
    * ROS service callback function to enable updates of the elevation map.
@@ -232,10 +197,6 @@ class ElevationMapping {
    */
   bool initializeElevationMap();
 
-  /*!
-   * Returns true if fusing the map is enabled.
-   */
-  bool isFusingEnabled();
 
   //! ROS nodehandle.
   std::shared_ptr<rclcpp::Node> nodeHandle_;
@@ -248,18 +209,12 @@ class ElevationMapping {
   message_filters::Subscriber<geometry_msgs::msg::PoseWithCovarianceStamped> robotPoseSubscriber_;
 
   //! ROS service servers.
-  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr fusionTriggerService_;
-  rclcpp::Service<grid_map_msgs::srv::GetGridMap>::SharedPtr fusedSubmapService_;
-  rclcpp::Service<grid_map_msgs::srv::GetGridMap>::SharedPtr rawSubmapService_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr enableUpdatesService_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr disableUpdatesService_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr clearMapService_;
   rclcpp::Service<grid_map_msgs::srv::SetGridMap>::SharedPtr maskedReplaceService_;
   rclcpp::Service<grid_map_msgs::srv::ProcessFile>::SharedPtr saveMapService_;
   rclcpp::Service<grid_map_msgs::srv::ProcessFile>::SharedPtr loadMapService_;
-
-  //! Callback group for fusion service thread.
-  rclcpp::CallbackGroup::SharedPtr fusionServiceGroup_;
 
   //! Cache for the robot pose messages.
   message_filters::Cache<geometry_msgs::msg::PoseWithCovarianceStamped> robotPoseCache_;
@@ -309,15 +264,6 @@ class ElevationMapping {
   //! Time tolerance for updating the map with data before the last update.
   //! This is useful when having multiple sensors adding data to the map.
   rclcpp::Duration timeTolerance_;
-
-  //! Timer for publishing the fused map.
-  rclcpp::TimerBase::SharedPtr fusedMapPublishTimer_;
-
-  //! Duration for the publishing the fusing map.
-  rclcpp::Duration fusedMapPublishTimerDuration_;
-
-  //! If map is fused after every change for debugging/analysis purposes.
-  bool isContinuouslyFusing_;
 
   //! Timer for the raytracing cleanup.
   rclcpp::TimerBase::SharedPtr visibilityCleanupTimer_;
