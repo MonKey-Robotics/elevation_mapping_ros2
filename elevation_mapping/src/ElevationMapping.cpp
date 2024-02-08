@@ -38,7 +38,7 @@ namespace elevation_mapping {
 ElevationMapping::ElevationMapping(std::shared_ptr<rclcpp::Node>& nodeHandle) :
       nodeHandle_(nodeHandle),
       inputSources_(nodeHandle_),
-      robotPoseCacheSize_(200),
+      robotOdomCacheSize_(200),
       // transformListener_(transformBuffer_),
       map_(nodeHandle),
       robotMotionMapUpdater_(nodeHandle),
@@ -97,10 +97,10 @@ void ElevationMapping::setupSubscribers() {  // Handle deprecated point_cloud_to
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Input sources not configured!");
   }
   
-  if (!robotPoseTopic_.empty()) {
-    robotPoseSubscriber_.subscribe(nodeHandle_, robotPoseTopic_);
-    robotPoseCache_.connectInput(robotPoseSubscriber_);
-    robotPoseCache_.setCacheSize(robotPoseCacheSize_);
+  if (!robotOdomTopic_.empty()) {
+    robotOdomSubscriber_.subscribe(nodeHandle_, robotOdomTopic_);
+    robotOdomCache_.connectInput(robotOdomSubscriber_);
+    robotOdomCache_.setCacheSize(robotOdomCacheSize_);
   } else {
     ignoreRobotMotionUpdates_ = true;
   }
@@ -160,22 +160,22 @@ bool ElevationMapping::readParameters() {
   // ElevationMapping parameters.
   nodeHandle_->declare_parameter("point_cloud_topic", std::string("/points"));
   //FIXME: Fix for case when robot pose is not defined
-  nodeHandle_->declare_parameter("robot_pose_with_covariance_topic", std::string("/pose"));
+  nodeHandle_->declare_parameter("robot_odom_topic", std::string("/odom"));
   nodeHandle_->declare_parameter("track_point_frame_id", std::string("/robot"));
   nodeHandle_->declare_parameter("track_point_x", 0.0);
   nodeHandle_->declare_parameter("track_point_y", 0.0);
   nodeHandle_->declare_parameter("track_point_z", 0.0);
-  nodeHandle_->declare_parameter("robot_pose_cache_size", 200);
+  nodeHandle_->declare_parameter("robot_odom_cache_size", 200);
 
   // nodeHandle_->get_parameter("point_cloud_topic", pointCloudTopic_);
-  nodeHandle_->get_parameter("robot_pose_with_covariance_topic", robotPoseTopic_);  
+  nodeHandle_->get_parameter("robot_odom_topic", robotOdomTopic_);  
   nodeHandle_->get_parameter("track_point_frame_id", trackPointFrameId_);
   nodeHandle_->get_parameter("track_point_x", trackPoint_.x());
   nodeHandle_->get_parameter("track_point_y", trackPoint_.y());
   nodeHandle_->get_parameter("track_point_z", trackPoint_.z());
-  nodeHandle_->get_parameter("robot_pose_cache_size", robotPoseCacheSize_);
+  nodeHandle_->get_parameter("robot_odom_cache_size", robotOdomCacheSize_);
 
-  assert(robotPoseCacheSize_ >= 0);
+  assert(robotOdomCacheSize_ >= 0);
 
   double minUpdateRate;
   nodeHandle_->declare_parameter("min_update_rate", 2.0);
@@ -340,7 +340,7 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
 
   // Check if point cloud has corresponding robot pose at the beginning
   if (!receivedFirstMatchingPointcloudAndPose_) {
-    const double oldestPoseTime = robotPoseCache_.getOldestTime().seconds();
+    const double oldestPoseTime = robotOdomCache_.getOldestTime().seconds();
     const double currentPointCloudTime = rclcpp::Time(pointCloudMsg->header.stamp).seconds();
 
     if (currentPointCloudTime < oldestPoseTime) {
@@ -369,18 +369,19 @@ void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSh
   Eigen::Matrix<double, 6, 6> robotPoseCovariance;
   robotPoseCovariance.setZero();
   if (!ignoreRobotMotionUpdates_) {
-    std::shared_ptr<const geometry_msgs::msg::PoseWithCovarianceStamped> poseMessage = robotPoseCache_.getElemBeforeTime(lastPointCloudUpdateTime_);
-    if (!poseMessage) {
+    std::shared_ptr<const nav_msgs::msg::Odometry> odomMessage = robotOdomCache_.getElemBeforeTime(lastPointCloudUpdateTime_);
+    if (!odomMessage) {
       // Tell the user that either for the timestamp no pose is available or that the buffer is possibly empty
-      if (robotPoseCache_.getOldestTime().seconds() > lastPointCloudUpdateTime_.seconds()) {
-        RCLCPP_ERROR(nodeHandle_->get_logger(), "The oldest pose available is at %f, requested pose at %f", robotPoseCache_.getOldestTime().seconds(),
+      if (robotOdomCache_.getOldestTime().seconds() > lastPointCloudUpdateTime_.seconds()) {
+        RCLCPP_ERROR(nodeHandle_->get_logger(), "The oldest pose available is at %f, requested pose at %f", robotOdomCache_.getOldestTime().seconds(),
                   lastPointCloudUpdateTime_.seconds());
       } else {
         RCLCPP_ERROR(nodeHandle_->get_logger(), "Could not get pose information from robot for time %f. Buffer empty?", lastPointCloudUpdateTime_.seconds());
       }
       return;
     }
-    robotPoseCovariance = Eigen::Map<const Eigen::MatrixXd>(poseMessage->pose.covariance.data(), 6, 6);
+    const geometry_msgs::msg::PoseWithCovariance poseMessage = odomMessage->pose;
+    robotPoseCovariance = Eigen::Map<const Eigen::MatrixXd>(poseMessage.covariance.data(), 6, 6);
   }
 
   // Process point cloud.
@@ -508,7 +509,7 @@ bool ElevationMapping::updatePrediction(const rclcpp::Time& time) {
     return true;
   }
 
-  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Updating map with latest prediction from time %f.", robotPoseCache_.getLatestTime().seconds());
+  RCLCPP_DEBUG(nodeHandle_->get_logger(), "Updating map with latest prediction from time %f.", robotOdomCache_.getLatestTime().seconds());
 
   if (time + timeTolerance_ < map_.getTimeOfLastUpdate()) {
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Requested update with time stamp %f, but time of last update was %f.", time.seconds(), map_.getTimeOfLastUpdate().seconds());
@@ -520,11 +521,11 @@ bool ElevationMapping::updatePrediction(const rclcpp::Time& time) {
   }
 
   // Get robot pose at requested time.
-  std::shared_ptr<const geometry_msgs::msg::PoseWithCovarianceStamped> poseMessage = robotPoseCache_.getElemBeforeTime(time);
-  if (!poseMessage) {
+  std::shared_ptr<const nav_msgs::msg::Odometry> odomMessage = robotOdomCache_.getElemBeforeTime(time);
+  if (!odomMessage) {
     // Tell the user that either for the timestamp no pose is available or that the buffer is possibly empty
-    if (robotPoseCache_.getOldestTime().seconds() > lastPointCloudUpdateTime_.seconds()) {
-      RCLCPP_ERROR(nodeHandle_->get_logger(), "The oldest pose available is at %f, requested pose at %f", robotPoseCache_.getOldestTime().seconds(),
+    if (robotOdomCache_.getOldestTime().seconds() > lastPointCloudUpdateTime_.seconds()) {
+      RCLCPP_ERROR(nodeHandle_->get_logger(), "The oldest pose available is at %f, requested pose at %f", robotOdomCache_.getOldestTime().seconds(),
                 lastPointCloudUpdateTime_.seconds());
     } else {
       RCLCPP_ERROR(nodeHandle_->get_logger(), "Could not get pose information from robot for time %f. Buffer empty?", lastPointCloudUpdateTime_.seconds());
@@ -532,11 +533,12 @@ bool ElevationMapping::updatePrediction(const rclcpp::Time& time) {
     return false;
   }
 
+  const geometry_msgs::msg::PoseWithCovariance poseMessage = odomMessage->pose;
   kindr::HomTransformQuatD robotPose;
-  kindr_ros::convertFromRosGeometryMsg(poseMessage->pose.pose, robotPose);
+  kindr_ros::convertFromRosGeometryMsg(poseMessage.pose, robotPose);
   // Covariance is stored in row-major in ROS: http://docs.ros.org/api/geometry_msgs/html/msg/PoseWithCovariance.html
   Eigen::Matrix<double, 6, 6> robotPoseCovariance =
-      Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(poseMessage->pose.covariance.data(), 6, 6);
+      Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(poseMessage.covariance.data(), 6, 6);
 
   // Compute map variance update from motion prediction.
   robotMotionMapUpdater_.update(map_, robotPose, robotPoseCovariance, time);
