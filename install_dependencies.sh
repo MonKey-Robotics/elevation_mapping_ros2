@@ -4,6 +4,7 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Install grid_map
+sudo apt update
 sudo apt install ros-$ROS_DISTRO-grid-map
 
 # Clone and install kindr
