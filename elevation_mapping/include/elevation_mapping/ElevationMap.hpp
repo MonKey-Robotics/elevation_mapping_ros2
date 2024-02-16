@@ -25,257 +25,252 @@
 #include "elevation_mapping/PointXYZRGBConfidenceRatio.hpp"
 #include "elevation_mapping/postprocessing/PostprocessorPool.hpp"
 
-namespace elevation_mapping {
-
-/*!
- * Elevation map stored as grid map handling elevation height, variance, color etc.
- */
-class ElevationMap {
- public:
-  /*!
-   * Constructor.
-   */
-  explicit ElevationMap(std::shared_ptr<rclcpp::Node> nodeHandle);
+namespace elevation_mapping
+{
 
   /*!
-   * Destructor.
+   * Elevation map stored as grid map handling elevation height, variance, color etc.
    */
-  virtual ~ElevationMap();
+  class ElevationMap
+  {
+  public:
+    /*!
+     * Constructor.
+     */
+    explicit ElevationMap(std::shared_ptr<rclcpp::Node> nodeHandle);
 
-  /*!
-   * Set the geometry of the elevation map. Clears all the data.
-   * @param length the side lengths in x, and y-direction of the elevation map [m].
-   * @param resolution the cell size in [m/cell].
-   * @param position the 2d position of the elevation map in the elevation map frame [m].
-   * @return true if successful.
-   */
-  void setGeometry(const grid_map::Length& length, const double& resolution, const grid_map::Position& position);
+    /*!
+     * Destructor.
+     */
+    virtual ~ElevationMap();
 
-  /*!
-   * Add new measurements to the elevation map.
-   * @param pointCloud the point cloud data.
-   * @param pointCloudVariances the corresponding variances of the point cloud data.
-   * @param timeStamp the time of the input point cloud.
-   * @param transformationSensorToMap
-   * @return true if successful.
-   */
-  bool add(const PointCloudType::Ptr pointCloud, Eigen::VectorXf& pointCloudVariances, const rclcpp::Time& timeStamp,
-           const Eigen::Affine3d& transformationSensorToMap);
 
-  /*!
-   * Update the elevation map with variance update data.
-   * @param varianceUpdate the variance update in vertical direction.
-   * @param horizontalVarianceUpdateX the variance update in horizontal x-direction.
-   * @param horizontalVarianceUpdateY the variance update in horizontal y-direction.
-   * @param horizontalVarianceUpdateXY the correlated variance update in horizontal xy-direction.
-   * @param time the time of the update.
-   * @return true if successful.
-   */
-  bool update(const grid_map::Matrix& varianceUpdate, const grid_map::Matrix& horizontalVarianceUpdateX,
-              const grid_map::Matrix& horizontalVarianceUpdateY, const grid_map::Matrix& horizontalVarianceUpdateXY, const rclcpp::Time& time);
 
-  /*!
-   * Clears all data of the elevation map (data and time).
-   * @return true if successful.
-   */
-  bool clear();
+    /*!
+     * Set the geometry of the elevation map. Clears all the data.
+     * @param length the side lengths in x, and y-direction of the elevation map [m].
+     * @param resolution the cell size in [m/cell].
+     * @param position the 2d position of the elevation map in the elevation map frame [m].
+     * @return true if successful.
+     */
+    void setGeometry(const grid_map::Length &length, const double &resolution, const grid_map::Position &position);
 
-  /*!
-   * Removes parts of the map based on visibility criterion with ray tracing.
-   * @param transformationSensorToMap
-   * @param updatedTime
-   */
-  void visibilityCleanup(const rclcpp::Time& updatedTime);
+    /*!
+     * Add new measurements to the elevation map.
+     * @param pointCloud the point cloud data.
+     * @param pointCloudVariances the corresponding variances of the point cloud data.
+     * @param timeStamp the time of the input point cloud.
+     * @param transformationSensorToMap
+     * @return true if successful.
+     */
+    bool add(const PointCloudType::Ptr pointCloud, Eigen::VectorXf &pointCloudVariances, const rclcpp::Time &timeStamp,
+             const Eigen::Affine3d &transformationSensorToMap);
 
-  /*!
-   * Move the grid map w.r.t. to the grid map frame.
-   * @param position the new location of the elevation map in the map frame.
-   */
-  void move(const Eigen::Vector2d& position);
+    /*!
+     * Update the elevation map with variance update data.
+     * @param varianceUpdate the variance update in vertical direction.
+     * @param horizontalVarianceUpdateX the variance update in horizontal x-direction.
+     * @param horizontalVarianceUpdateY the variance update in horizontal y-direction.
+     * @param horizontalVarianceUpdateXY the correlated variance update in horizontal xy-direction.
+     * @param time the time of the update.
+     * @return true if successful.
+     */
+    bool update(const grid_map::Matrix &varianceUpdate, const grid_map::Matrix &horizontalVarianceUpdateX,
+                const grid_map::Matrix &horizontalVarianceUpdateY, const grid_map::Matrix &horizontalVarianceUpdateXY, const rclcpp::Time &time);
 
-  /*!
-   * Publishes the (latest) raw elevation map. Optionally, if a postprocessing pipeline was configured,
-   * the map is postprocessed before publishing.
-   * @return true if successful.
-   */
-  bool postprocessAndPublishRawElevationMap();
+    /*!
+     * Clears all data of the elevation map (data and time).
+     * @return true if successful.
+     */
+    bool clear();
 
-  /*!
-   * Publishes the (latest) visibility cleanup map.
-   * @return true if successful.
-   */
-  bool publishVisibilityCleanupMap();
+    /*!
+     * Removes parts of the map based on visibility criterion with ray tracing.
+     * @param transformationSensorToMap
+     * @param updatedTime
+     */
+    void visibilityCleanup(const rclcpp::Time &updatedTime);
 
-  /*!
-   * Gets a reference to the raw grid map.
-   * @return the raw grid map.
-   */
-  grid_map::GridMap& getRawGridMap();
+    /*!
+     * Move the grid map w.r.t. to the grid map frame.
+     * @param position the new location of the elevation map in the map frame.
+     */
+    void move(const Eigen::Vector2d &position);
 
-  /*!
-   * Sets a raw grid map.
-   * @param map The input raw grid map to set.
-   */
-  void setRawGridMap(const grid_map::GridMap& map);
+    /*!
+     * Publishes the (latest) raw elevation map. Optionally, if a postprocessing pipeline was configured,
+     * the map is postprocessed before publishing.
+     * @return true if successful.
+     */
+    bool postprocessAndPublishRawElevationMap();
 
-  /*!
-   * Gets the time of last map update.
-   * @return time of the last map update.
-   */
-  rclcpp::Time getTimeOfLastUpdate();
+    /*!
+     * Publishes the (latest) visibility cleanup map.
+     * @return true if successful.
+     */
+    bool publishVisibilityCleanupMap();
 
-  /*!
-   * Gets the time of last map fusion.
-   * @return time of the last map fusion.
-   */
-  rclcpp::Time getTimeOfLastFusion();
+    /*!
+     * Gets a reference to the raw grid map.
+     * @return the raw grid map.
+     */
+    grid_map::GridMap &getRawGridMap();
 
-  /*!
-   * Get the pose of the elevation map frame w.r.t. the inertial parent frame of the robot (e.g. world, map etc.).
-   * @return pose of the elevation map frame w.r.t. the parent frame of the robot.
-   */
-  const kindr::HomTransformQuatD& getPose();
+    /*!
+     * Sets a raw grid map.
+     * @param map The input raw grid map to set.
+     */
+    void setRawGridMap(const grid_map::GridMap &map);
 
-  /*!
-   * Gets the position of a raw data point (x, y of cell position & height of cell value) in
-   * the parent frame of the robot.
-   * @param index the index of the requested cell.
-   * @param position the position of the data point in the parent frame of the robot.
-   * @return true if successful, false if no valid data available.
-   */
-  bool getPosition3dInRobotParentFrame(const Eigen::Array2i& index, kindr::Position3D& position);
+    /*!
+     * Gets the time of last map update.
+     * @return time of the last map update.
+     */
+    rclcpp::Time getTimeOfLastUpdate();
 
-  /*!
-   * Gets the fused data mutex.
-   * @return reference to the fused data mutex.
-   */
-  std::recursive_mutex& getFusedDataMutex();
+    /*!
+     * Gets the time of last map fusion.
+     * @return time of the last map fusion.
+     */
+    rclcpp::Time getTimeOfLastFusion();
 
-  /*!
-   * Gets the raw data mutex.
-   * @return reference to the raw data mutex.
-   */
-  std::recursive_mutex& getRawDataMutex();
+    /*!
+     * Get the pose of the elevation map frame w.r.t. the inertial parent frame of the robot (e.g. world, map etc.).
+     * @return pose of the elevation map frame w.r.t. the parent frame of the robot.
+     */
+    const kindr::HomTransformQuatD &getPose();
 
-  /*!
-   * Set the frame id.
-   * @param frameId the frame id.
-   */
-  void setFrameId(const std::string& frameId);
+    /*!
+     * Gets the position of a raw data point (x, y of cell position & height of cell value) in
+     * the parent frame of the robot.
+     * @param index the index of the requested cell.
+     * @param position the position of the data point in the parent frame of the robot.
+     * @return true if successful, false if no valid data available.
+     */
+    bool getPosition3dInRobotParentFrame(const Eigen::Array2i &index, kindr::Position3D &position);
 
-  /*!
-   * Get the frame id.
-   * @return the frameId.
-   */
-  const std::string& getFrameId();
+    /*!
+     * Gets the fused data mutex.
+     * @return reference to the fused data mutex.
+     */
+    std::recursive_mutex &getFusedDataMutex();
 
-  /*!
-   * Set the timestamp of the raw and fused elevation map.
-   * @param timestmap to set.
-   */
-  void setTimestamp(rclcpp::Time timestamp);
+    /*!
+     * Gets the raw data mutex.
+     * @return reference to the raw data mutex.
+     */
+    std::recursive_mutex &getRawDataMutex();
 
-  /*!
-   * If the raw elevation map has subscribers.
-   * @return true if number of subscribers bigger then 0.
-   */
-  bool hasRawMapSubscribers() const;
+    /*!
+     * Set the frame id.
+     * @param frameId the frame id.
+     */
+    void setFrameId(const std::string &frameId);
 
-  /*!
-   * Callback method for the updates of the underlying map.
-   * Updates the internal underlying map.
-   * @param underlyingMap the underlying map.
-   */
-  void underlyingMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr underlyingMap);
+    /*!
+     * Get the frame id.
+     * @return the frameId.
+     */
+    const std::string &getFrameId();
 
-  /*!
-   * Method to set the height value around the center of the robot, can be used for initialization.
-   * @param initPosition Position to calculate inner rectangle.
-   * @param mapHeight The height that gets set uniformly.
-   * @param lengthInXSubmap Length of the submap in X direction.
-   * @param lengthInYSubmap Length of the submap in Y direction.
-   * @param margin Extra margin that gets added to the submap boundaries.
-   */
-  void setRawSubmapHeight(const grid_map::Position& initPosition, float mapHeight, double lengthInXSubmap, double lengthInYSubmap,
-                          double margin);
+    /*!
+     * Set the timestamp of the raw and fused elevation map.
+     * @param timestmap to set.
+     */
+    void setTimestamp(rclcpp::Time timestamp);
 
-  friend class ElevationMapping;
+    /*!
+     * If the raw elevation map has subscribers.
+     * @return true if number of subscribers bigger then 0.
+     */
+    bool hasRawMapSubscribers() const;
 
- private:
-  /*!
-   * Fuses a region of the map.
-   * @param topLeftIndex the top left index of the region.
-   * @param size the size (in number of cells) of the region.
-   * @return true if successful.
-   */
-  bool fuse(const grid_map::Index& topLeftIndex, const grid_map::Index& size);
+    /*!
+     * Method to set the height value around the center of the robot, can be used for initialization.
+     * @param initPosition Position to calculate inner rectangle.
+     * @param mapHeight The height that gets set uniformly.
+     * @param lengthInXSubmap Length of the submap in X direction.
+     * @param lengthInYSubmap Length of the submap in Y direction.
+     * @param margin Extra margin that gets added to the submap boundaries.
+     */
+    void setRawSubmapHeight(const grid_map::Position &initPosition, float mapHeight, double lengthInXSubmap, double lengthInYSubmap,
+                            double margin);
 
-  /*!
-   * Cleans the elevation map data to stay within the specified bounds.
-   * @return true if successful.
-   */
-  bool clean();
+    friend class ElevationMapping;
 
-  /*!
-   * Cumulative distribution function.
-   * @param x the argument value.
-   * @param mean the mean of the distribution.
-   * @param standardDeviation the standardDeviation of the distribution.
-   * @return the function value.
-   */
-  float cumulativeDistributionFunction(float x, float mean, float standardDeviation);
+  private:
+    /*!
+     * Reads and verifies the ROS parameters.
+     *
+     * @return true if successful.
+     */
+    bool readParameters();
 
-  //! ROS nodehandle.
-  std::shared_ptr<rclcpp::Node> nodeHandle_;
+    /*!
+     * Fuses a region of the map.
+     * @param topLeftIndex the top left index of the region.
+     * @param size the size (in number of cells) of the region.
+     * @return true if successful.
+     */
+    bool fuse(const grid_map::Index &topLeftIndex, const grid_map::Index &size);
 
-  //! Raw elevation map as grid map.
-  grid_map::GridMap rawMap_;
+    /*!
+     * Cleans the elevation map data to stay within the specified bounds.
+     * @return true if successful.
+     */
+    bool clean();
 
-  //! Fused elevation map as grid map.
-  grid_map::GridMap fusedMap_;
+    /*!
+     * Cumulative distribution function.
+     * @param x the argument value.
+     * @param mean the mean of the distribution.
+     * @param standardDeviation the standardDeviation of the distribution.
+     * @return the function value.
+     */
+    float cumulativeDistributionFunction(float x, float mean, float standardDeviation);
 
-  //! Visibility cleanup debug map.
-  grid_map::GridMap visibilityCleanupMap_;
+    //! ROS nodehandle.
+    std::shared_ptr<rclcpp::Node> nodeHandle_;
 
-  //! Underlying map, used for ground truth maps, multi-robot mapping etc.
-  grid_map::GridMap underlyingMap_;
+    //! Raw elevation map as grid map.
+    grid_map::GridMap rawMap_;
 
-  //! Thread Pool to handle raw map postprocessing filter pipelines.
-  PostprocessorPool postprocessorPool_;
+    //! Fused elevation map as grid map.
+    grid_map::GridMap fusedMap_;
 
-  //! True if underlying map has been set, false otherwise.
-  bool hasUnderlyingMap_;
+    //! Visibility cleanup debug map.
+    grid_map::GridMap visibilityCleanupMap_;
 
-  //! Pose of the elevation map frame w.r.t. the inertial parent frame of the robot (e.g. world, map etc.).
-  kindr::HomTransformQuatD pose_;
+    //! Thread Pool to handle raw map postprocessing filter pipelines.
+    PostprocessorPool postprocessorPool_;
 
-  //! ROS publishers. Publishing of the raw elevation map is handled by the postprocessing pool.
-  rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr visibilityCleanupMapPublisher_;
+    //! Pose of the elevation map frame w.r.t. the inertial parent frame of the robot (e.g. world, map etc.).
+    kindr::HomTransformQuatD pose_;
 
-  //! Mutex lock for raw map.
-  std::recursive_mutex rawMapMutex_;
+    //! ROS publishers. Publishing of the raw elevation map is handled by the postprocessing pool.
+    rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr visibilityCleanupMapPublisher_;
 
-  //! Mutex lock for visibility cleanup map.
-  std::recursive_mutex visibilityCleanupMapMutex_;
+    //! Mutex lock for raw map.
+    std::recursive_mutex rawMapMutex_;
 
-  //! Underlying map subscriber.
-  rclcpp::Subscription<grid_map_msgs::msg::GridMap>::SharedPtr underlyingMapSubscriber_;
+    //! Mutex lock for visibility cleanup map.
+    std::recursive_mutex visibilityCleanupMapMutex_;
 
-  //! Initial ros time
-  rclcpp::Time initialTime_;
+    //! Initial ros time
+    rclcpp::Time initialTime_;
 
-  //! Parameters. Are set through the ElevationMapping class.
-  double minVariance_;
-  double maxVariance_;
-  double mahalanobisDistanceThreshold_;
-  double multiHeightNoise_;
-  double minHorizontalVariance_;
-  double maxHorizontalVariance_;
-  std::string underlyingMapTopic_;
-  bool enableVisibilityCleanup_;
-  bool enableContinuousCleanup_;
-  double visibilityCleanupDuration_;
-  double scanningDuration_;
-};
+    //! Parameters. Are set through the ElevationMapping class.
+    std::string frameId_;
+    double minVariance_;
+    double maxVariance_;
+    double mahalanobisDistanceThreshold_;
+    double multiHeightNoise_;
+    double minHorizontalVariance_;
+    double maxHorizontalVariance_;
+    bool enableVisibilityCleanup_;
+    bool enableContinuousCleanup_;
+    double visibilityCleanupDuration_;
+    double scanningDuration_;
+  };
 
-}  // namespace elevation_mapping
+} // namespace elevation_mapping

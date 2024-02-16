@@ -1,28 +1,14 @@
 # Robot-Centric Elevation Mapping
 
-## PORT TO ROS2
+This is a simplified version of the [Robot-Centric Elevation Mapping](https://github.com/ANYbotics/elevation_mapping) package from Anybotics. The main changes are the following:
 
-This is a quick port of [Robot-Centric Elevation Mapping](https://github.com/ANYbotics/elevation_mapping) to ROS2 based on Aber-CRANC's [tf2 branch](https://github.com/Aber-CRANC/elevation_mapping/tree/tf2).
-Tested in ROS2 foxy.
-
-### Changes in ROS2 version:
-- `point_cloud_topic` parameter was removed
-- `input_sources` parameter was introduced to specify list of input sources eg. `["top", "front"]`
-- Individual input sources are specified as a parameter group. The name of the input source has to match one in the list.
-- Post processing filters has to respect new config style introduced in ROS2, see grid_map [filters demo](https://github.com/ANYbotics/grid_map/blob/foxy-devel/grid_map_demos/config/filters_demo_filter_chain.yaml)
-- Added cropbox filter into input processing 
-
-Port TODO list:
-- [x] Port of barebone functionality
-- [ ] Fix all new bugs created during porting
-- [ ] Timers
-- [x] Services
-- [ ] Fix multithreading
-- [ ] Demos
-- [ ] Testing
-
-Known Issues:
-- The current ROS2 interpretation of filter chain causes issues with parameter redeclaration when using more than 1 postprocessing thread.
+* Migrated to ROS2 Humble
+* Removed deprecated parameter `point_cloud_topic`
+* Introduced `input_sources` parameter to specify list of input sources eg. `["top", "front"]`
+* Removed implementation of post-processing filters to use directly `grid_map_demos`
+* Subscribing to a `nav_msgs/Odometry` topic instead of `geometry_msgs/Pose`
+* Removed `robot_base_frame_id` parameter as it is not used
+* Removed underlying map handling
 
 Dependencies:
 - [grid_map](https://github.com/ANYbotics/grid_map/tree/foxy-devel) - foxy-devel branch

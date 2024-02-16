@@ -38,8 +38,7 @@ ElevationMap::ElevationMap(std::shared_ptr<rclcpp::Node> nodeHandle)
       rawMap_({"elevation", "variance", "horizontal_variance_x", "horizontal_variance_y", "horizontal_variance_xy", "color", "time",
                "dynamic_time", "lowest_scan_point", "sensor_x_at_lowest_scan", "sensor_y_at_lowest_scan", "sensor_z_at_lowest_scan"}),
       // FIXME: Postprocessor num threads should be same as number of filters
-      postprocessorPool_(nodeHandle_->get_parameter("postprocessor_num_threads").as_int(), nodeHandle_),
-      hasUnderlyingMap_(false),
+      postprocessorPool_(1, nodeHandle_),
       minVariance_(0.000009),
       maxVariance_(0.0009),
       mahalanobisDistanceThreshold_(2.5),
@@ -53,9 +52,8 @@ ElevationMap::ElevationMap(std::shared_ptr<rclcpp::Node> nodeHandle)
   rawMap_.setBasicLayers({"elevation", "variance"});
   clear();
 
-  if (!underlyingMapTopic_.empty()) {
-    underlyingMapSubscriber_ = nodeHandle_->create_subscription<grid_map_msgs::msg::GridMap>(underlyingMapTopic_, 1, std::bind(&ElevationMap::underlyingMapCallback, this, std::placeholders::_1));
-  }
+  readParameters();
+
   // TODO(max): if (enableVisibilityCleanup_) when parameter cleanup is ready.
   visibilityCleanupMapPublisher_ = nodeHandle_->create_publisher<grid_map_msgs::msg::GridMap>("visibility_cleanup_map", 1);
 
@@ -63,6 +61,45 @@ ElevationMap::ElevationMap(std::shared_ptr<rclcpp::Node> nodeHandle)
 }
 
 ElevationMap::~ElevationMap() = default;
+
+bool ElevationMap::readParameters() {
+    
+    frameId_ = nodeHandle_->declare_parameter("map_frame_id", std::string("/map"));
+    setFrameId(frameId_);
+
+    grid_map::Length length;
+    grid_map::Position position;
+    double resolution;
+
+    length(0) = nodeHandle_->declare_parameter("length_in_x", 1.5);
+    length(1) = nodeHandle_->declare_parameter("length_in_y", 1.5);
+    position.x() = nodeHandle_->declare_parameter("position_x", 0.0);
+    position.y() = nodeHandle_->declare_parameter("position_y", 0.0);
+    resolution = nodeHandle_->declare_parameter("resolution", 0.01);
+    setGeometry(length, resolution, position);
+
+    minVariance_ = nodeHandle_->declare_parameter("min_variance", pow(0.003, 2));
+    maxVariance_ = nodeHandle_->declare_parameter("max_variance", pow(0.03, 2));
+    mahalanobisDistanceThreshold_ = nodeHandle_->declare_parameter("mahalanobis_distance_threshold", 2.5);
+    multiHeightNoise_ = nodeHandle_->declare_parameter("multi_height_noise", pow(0.003, 2));
+    minHorizontalVariance_ = nodeHandle_->declare_parameter("min_horizontal_variance", pow(resolution / 2.0, 2)); // two-sigma
+    maxHorizontalVariance_ = nodeHandle_->declare_parameter("max_horizontal_variance", 0.5);
+    nodeHandle_->declare_parameter("enable_visibility_cleanup", true);
+    nodeHandle_->declare_parameter("enable_continuous_cleanup", false);
+    nodeHandle_->declare_parameter("scanning_duration", 1.0);
+    nodeHandle_->declare_parameter("masked_replace_service_mask_layer_name", std::string("mask"));
+
+    nodeHandle_->get_parameter("min_variance", map_.minVariance_);
+    nodeHandle_->get_parameter("max_variance", map_.maxVariance_);
+    nodeHandle_->get_parameter("mahalanobis_distance_threshold", map_.mahalanobisDistanceThreshold_);
+    nodeHandle_->get_parameter("multi_height_noise", map_.multiHeightNoise_);
+    nodeHandle_->get_parameter("min_horizontal_variance", map_.minHorizontalVariance_); // two-sigma
+    nodeHandle_->get_parameter("max_horizontal_variance", map_.maxHorizontalVariance_);
+    nodeHandle_->get_parameter("enable_visibility_cleanup", map_.enableVisibilityCleanup_);
+    nodeHandle_->get_parameter("enable_continuous_cleanup", map_.enableContinuousCleanup_);
+    nodeHandle_->get_parameter("scanning_duration", map_.scanningDuration_);
+    nodeHandle_->get_parameter("masked_replace_service_mask_layer_name", maskedReplaceServiceMaskLayerName_);
+}
 
 void ElevationMap::setGeometry(const grid_map::Length& length, const double& resolution, const grid_map::Position& position) {
   std::unique_lock<std::recursive_mutex> scopedLockForRawData(rawMapMutex_);
@@ -339,10 +376,6 @@ void ElevationMap::move(const Eigen::Vector2d& position) {
     // The "dynamic_time" layer is meant to be interpreted as integer values, therefore nan:s need to be zeroed.
     grid_map::Matrix& dynTime{rawMap_.get("dynamic_time")};
     dynTime = dynTime.array().isNaN().select(grid_map::Matrix::Scalar(0.0f), dynTime.array());
-
-    if (hasUnderlyingMap_) {
-      rawMap_.addDataFrom(underlyingMap_, false, false, true);
-    }
   }
 }
 
@@ -433,36 +466,6 @@ const std::string& ElevationMap::getFrameId() {
 
 bool ElevationMap::hasRawMapSubscribers() const {
   return postprocessorPool_.pipelineHasSubscribers();
-}
-
-
-void ElevationMap::underlyingMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr underlyingMap) {
-  RCLCPP_INFO(nodeHandle_->get_logger(), "Updating underlying map.");
-  grid_map::GridMapRosConverter::fromMessage(*underlyingMap, underlyingMap_);
-  if (underlyingMap_.getFrameId() != rawMap_.getFrameId()) {
-    RCLCPP_ERROR_STREAM(nodeHandle_->get_logger(), "The underlying map does not have the same map frame ('" << underlyingMap_.getFrameId() << "') as the elevation map ('"
-                                                                              << rawMap_.getFrameId() << "').");
-    return;
-  }
-  if (!underlyingMap_.exists("elevation")) {
-    RCLCPP_ERROR_STREAM(nodeHandle_->get_logger(), "The underlying map does not have an 'elevation' layer.");
-    return;
-  }
-  if (!underlyingMap_.exists("variance")) {
-    underlyingMap_.add("variance", minVariance_);
-  }
-  if (!underlyingMap_.exists("horizontal_variance_x")) {
-    underlyingMap_.add("horizontal_variance_x", minHorizontalVariance_);
-  }
-  if (!underlyingMap_.exists("horizontal_variance_y")) {
-    underlyingMap_.add("horizontal_variance_y", minHorizontalVariance_);
-  }
-  if (!underlyingMap_.exists("color")) {
-    underlyingMap_.add("color", 0.0);
-  }
-  underlyingMap_.setBasicLayers(rawMap_.getBasicLayers());
-  hasUnderlyingMap_ = true;
-  rawMap_.addDataFrom(underlyingMap_, false, false, true);
 }
 
 void ElevationMap::setRawSubmapHeight(const grid_map::Position& initPosition, float mapHeight, double lengthInXSubmap,
