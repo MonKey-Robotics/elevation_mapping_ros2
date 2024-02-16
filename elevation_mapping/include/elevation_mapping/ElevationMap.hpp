@@ -98,11 +98,10 @@ namespace elevation_mapping
     void move(const Eigen::Vector2d &position);
 
     /*!
-     * Publishes the (latest) raw elevation map. Optionally, if a postprocessing pipeline was configured,
-     * the map is postprocessed before publishing.
+     * Publishes the raw elevation map.
      * @return true if successful.
      */
-    bool postprocessAndPublishRawElevationMap();
+    bool publishRawElevationMap();
 
     /*!
      * Publishes the (latest) visibility cleanup map.
@@ -180,12 +179,6 @@ namespace elevation_mapping
     void setTimestamp(rclcpp::Time timestamp);
 
     /*!
-     * If the raw elevation map has subscribers.
-     * @return true if number of subscribers bigger then 0.
-     */
-    bool hasRawMapSubscribers() const;
-
-    /*!
      * Method to set the height value around the center of the robot, can be used for initialization.
      * @param initPosition Position to calculate inner rectangle.
      * @param mapHeight The height that gets set uniformly.
@@ -205,6 +198,11 @@ namespace elevation_mapping
      * @return true if successful.
      */
     bool readParameters();
+
+    /**
+     * Sets up the publishers for elevation maps
+     */
+    void setupPublishers();
 
     /*!
      * Fuses a region of the map.
@@ -235,19 +233,14 @@ namespace elevation_mapping
     //! Raw elevation map as grid map.
     grid_map::GridMap rawMap_;
 
-    //! Fused elevation map as grid map.
-    grid_map::GridMap fusedMap_;
-
     //! Visibility cleanup debug map.
     grid_map::GridMap visibilityCleanupMap_;
-
-    //! Thread Pool to handle raw map postprocessing filter pipelines.
-    PostprocessorPool postprocessorPool_;
 
     //! Pose of the elevation map frame w.r.t. the inertial parent frame of the robot (e.g. world, map etc.).
     kindr::HomTransformQuatD pose_;
 
-    //! ROS publishers. Publishing of the raw elevation map is handled by the postprocessing pool.
+    //! ROS publishers.
+    rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr rawMapPublisher_;
     rclcpp::Publisher<grid_map_msgs::msg::GridMap>::SharedPtr visibilityCleanupMapPublisher_;
 
     //! Mutex lock for raw map.
@@ -259,7 +252,10 @@ namespace elevation_mapping
     //! Initial ros time
     rclcpp::Time initialTime_;
 
-    //! Parameters. Are set through the ElevationMapping class.
+    //! Topic on which the elevation map is published.
+    std::string elevationMapTopic_;
+
+    //!  Map Parameters
     std::string frameId_;
     double minVariance_;
     double maxVariance_;

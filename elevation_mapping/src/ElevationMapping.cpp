@@ -59,7 +59,7 @@ namespace elevation_mapping
 
     readParameters();
     setupSubscribers();
-    // setupServices();
+    setupServices();
     setupTimers();
 
     transformBuffer_ = std::make_shared<tf2_ros::Buffer>(nodeHandle_->get_clock());
@@ -71,7 +71,7 @@ namespace elevation_mapping
   }
 
   void ElevationMapping::setupSubscribers()
-  { // Handle deprecated point_cloud_topic and input_sources configuration.
+  {
     auto res = nodeHandle_->get_topic_names_and_types();
     for (auto a : res)
     {
@@ -145,11 +145,9 @@ namespace elevation_mapping
     trackPoint_.z() = nodeHandle_->declare_parameter("track_point_z", 0.0);
     robotOdomCacheSize_ = nodeHandle_->declare_parameter("robot_odom_cache_size", 200);
 
-    assert(robotOdomCacheSize_ >= 0);
+    assert(robotOdomCacheSize_ > 0);
 
-    double minUpdateRate;
-    nodeHandle_->declare_parameter("min_update_rate", 2.0);
-    nodeHandle_->get_parameter("min_update_rate", minUpdateRate);
+    double minUpdateRate = nodeHandle_->declare_parameter("min_update_rate", 2.0);
     if (minUpdateRate == 0.0)
     {
       maxNoUpdateDuration_ = rclcpp::Duration::from_seconds(0);
@@ -161,14 +159,10 @@ namespace elevation_mapping
     }
     assert(maxNoUpdateDuration_.seconds() != 0.0);
 
-    double timeTolerance;
-    nodeHandle_->declare_parameter("time_tolerance", 0.0);
-    nodeHandle_->get_parameter("time_tolerance", timeTolerance);
+    double timeTolerance = nodeHandle_->declare_parameter("time_tolerance", 0.0);
     timeTolerance_ = rclcpp::Duration::from_seconds(timeTolerance);
 
-    double visibilityCleanupRate;
-    nodeHandle_->declare_parameter("visibility_cleanup_rate", 1.0);
-    nodeHandle_->get_parameter("visibility_cleanup_rate", visibilityCleanupRate);
+    double visibilityCleanupRate = nodeHandle_->declare_parameter("visibility_cleanup_rate", 1.0);
     if (visibilityCleanupRate == 0.0)
     {
       visibilityCleanupTimerDuration_ = rclcpp::Duration::from_seconds(0.0);
@@ -219,7 +213,7 @@ namespace elevation_mapping
       if (publishPointCloud)
       {
         map_.setTimestamp(nodeHandle_->get_clock()->now());
-        map_.postprocessAndPublishRawElevationMap();
+        map_.publishRawElevationMap();
       }
       return;
     }
@@ -329,7 +323,7 @@ namespace elevation_mapping
     {
       RCLCPP_INFO(nodeHandle_->get_logger(), "Publishing pcl.");
       // Publish elevation map.
-      map_.postprocessAndPublishRawElevationMap();
+      map_.publishRawElevationMap();
     }
 
     mapUpdateTimer_->reset();
@@ -343,7 +337,7 @@ namespace elevation_mapping
       rclcpp::Clock clock;
       RCLCPP_WARN_THROTTLE(nodeHandle_->get_logger(), clock, 10, "Updating of elevation map is disabled. (Warning message is throttled, 10s.)");
       map_.setTimestamp(nodeHandle_->get_clock()->now());
-      map_.postprocessAndPublishRawElevationMap();
+      map_.publishRawElevationMap();
       return;
     }
 
@@ -368,7 +362,7 @@ namespace elevation_mapping
     }
 
     // Publish elevation map.
-    map_.postprocessAndPublishRawElevationMap();
+    map_.publishRawElevationMap();
     mapUpdateTimer_->reset();
   }
 
@@ -531,9 +525,9 @@ namespace elevation_mapping
 
     // Use the supplied mask or do not use a mask
     grid_map::Matrix mask;
-    if (sourceMap.exists(maskedReplaceServiceMaskLayerName_))
+    if (sourceMap.exists("mask"))
     {
-      mask = sourceMap[maskedReplaceServiceMaskLayerName_];
+      mask = sourceMap["mask"];
     }
     else
     {
@@ -547,7 +541,7 @@ namespace elevation_mapping
          sourceLayerIterator++)
     {
       // skip "mask" layer
-      if (*sourceLayerIterator == maskedReplaceServiceMaskLayerName_)
+      if (*sourceLayerIterator == "mask")
       {
         continue;
       }
@@ -623,7 +617,7 @@ namespace elevation_mapping
 
     // Update timestamp for visualization in ROS
     map_.setTimestamp(nodeHandle_->get_clock()->now());
-    map_.postprocessAndPublishRawElevationMap();
+    map_.publishRawElevationMap();
     return static_cast<bool>(response->success);
   }
 

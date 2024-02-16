@@ -56,12 +56,6 @@ class PostprocessorPool {
    */
   bool runTask(const GridMap& gridMap);
 
-  /**
-   * @brief Performs a check on the number of subscribers.
-   * @return True if someone listens to the topic that the managed postprocessor_ publishes to.
-   */
-  bool pipelineHasSubscribers() const;
-
  private:
   /**
    * @brief Wrap a task so that the postprocessor pool gets notified on completion of the task.

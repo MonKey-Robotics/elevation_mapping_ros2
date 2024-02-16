@@ -274,9 +274,6 @@ namespace elevation_mapping
     //! Becomes true when corresponding poses and point clouds can be found
     bool receivedFirstMatchingPointcloudAndPose_;
 
-    //! Name of the mask layer used in the masked replace service
-    std::string maskedReplaceServiceMaskLayerName_;
-
     //! Width and height of submap of the elevation map with a constant height
     double lengthInXInitSubmap_;
     double lengthInYInitSubmap_;

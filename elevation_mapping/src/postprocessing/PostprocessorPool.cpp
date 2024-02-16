@@ -76,9 +76,4 @@ void PostprocessorPool::wrapTask(size_t serviceIndex) {
   availableServices_.push_back(serviceIndex);
 }
 
-bool PostprocessorPool::pipelineHasSubscribers() const {
-  return std::all_of(workers_.cbegin(), workers_.cend(),
-                     [](const std::unique_ptr<PostprocessingWorker>& worker) { return worker->hasSubscribers(); });
-}
-
 }  // namespace elevation_mapping
