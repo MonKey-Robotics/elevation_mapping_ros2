@@ -139,7 +139,8 @@ namespace elevation_mapping
     // ElevationMapping parameters.
     // FIXME: Fix for case when robot pose is not defined
     robotOdomTopic_ = nodeHandle_->declare_parameter("robot_odom_topic", std::string("/odom"));
-    trackPointFrameId_ = nodeHandle_->declare_parameter("track_point_frame_id", std::string("/robot"));
+    nodeHandle_->declare_parameter("robot_base_frame_id", std::string("base_link"));
+    trackPointFrameId_ = nodeHandle_->declare_parameter("track_point_frame_id", std::string("base_link"));
     trackPoint_.x() = nodeHandle_->declare_parameter("track_point_x", 0.0);
     trackPoint_.y() = nodeHandle_->declare_parameter("track_point_y", 0.0);
     trackPoint_.z() = nodeHandle_->declare_parameter("track_point_z", 0.0);
@@ -174,12 +175,6 @@ namespace elevation_mapping
       map_.visibilityCleanupDuration_ = 1.0 / visibilityCleanupRate;
     }
 
-    // ElevationMap parameters.
-    if (!map_.readParameters())
-    {
-      return false;
-    }
-
     // Robot motion map updater parameters.
     if (!robotMotionMapUpdater_.readParameters())
     {
@@ -205,7 +200,7 @@ namespace elevation_mapping
   void ElevationMapping::pointCloudCallback(sensor_msgs::msg::PointCloud2::ConstSharedPtr pointCloudMsg, bool publishPointCloud,
                                             const SensorProcessorBase::Ptr &sensorProcessor_)
   {
-    RCLCPP_INFO(nodeHandle_->get_logger(), "Processing data from: %s", pointCloudMsg->header.frame_id.c_str());
+    RCLCPP_DEBUG(nodeHandle_->get_logger(), "Processing data from: %s", pointCloudMsg->header.frame_id.c_str());
     if (!updatesEnabled_)
     {
       auto clock = nodeHandle_->get_clock();
@@ -321,7 +316,7 @@ namespace elevation_mapping
 
     if (publishPointCloud)
     {
-      RCLCPP_INFO(nodeHandle_->get_logger(), "Publishing pcl.");
+      RCLCPP_DEBUG(nodeHandle_->get_logger(), "Publishing pcl.");
       // Publish elevation map.
       map_.publishRawElevationMap();
     }
@@ -369,7 +364,7 @@ namespace elevation_mapping
   void ElevationMapping::visibilityCleanupCallback()
   {
 
-    RCLCPP_INFO(nodeHandle_->get_logger(), "Elevation map is running visibility cleanup.");
+    RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation map is running visibility cleanup.");
     // Copy constructors for thread-safety.x
     map_.visibilityCleanup(rclcpp::Time(lastPointCloudUpdateTime_));
   }

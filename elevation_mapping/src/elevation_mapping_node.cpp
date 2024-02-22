@@ -14,9 +14,6 @@ int main(int argc, char** argv) {
      
   auto nodeHandle = rclcpp::Node::make_shared("elevation_mapping");
 
-  nodeHandle->declare_parameter("num_callback_threads", 1);
-  nodeHandle->declare_parameter("postprocessor_num_threads", 1);
-
   elevation_mapping::ElevationMapping elevationMap(nodeHandle);  
 
   // Spin

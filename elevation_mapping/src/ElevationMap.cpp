@@ -84,7 +84,7 @@ namespace elevation_mapping
 
   void ElevationMap::setupPublishers()
   {
-    nodeHandle_->create_publisher<grid_map_msgs::msg::GridMap>(elevationMapTopic_, 1);
+    rawMapPublisher_ = nodeHandle_->create_publisher<grid_map_msgs::msg::GridMap>(elevationMapTopic_, 1);
 
     if (enableVisibilityCleanup_) {
       visibilityCleanupMapPublisher_ = nodeHandle_->create_publisher<grid_map_msgs::msg::GridMap>("visibility_cleanup_map", 1);
@@ -414,7 +414,7 @@ namespace elevation_mapping
 
     std::unique_ptr<grid_map_msgs::msg::GridMap> message;
     message = grid_map::GridMapRosConverter::toMessage(rawMapCopy);
-    rawMapPublisher_->publish(std::move(message));
+    rawMapPublisher_->publish(std::move(message)); // CRASHES HERE
 
     RCLCPP_DEBUG(nodeHandle_->get_logger(), "Elevation map has been published.");
     return true;

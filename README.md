@@ -96,14 +96,15 @@ This software is built on the Robotic Operating System ([ROS]), which needs to b
 
 In order to install the Robot-Centric Elevation Mapping, clone the latest version from this repository into your catkin workspace and compile the package using ROS.
 
-    cd catkin_workspace/src
+    cd ~/ros2_ws/src
     git clone https://github.com/anybotics/elevation_mapping.git
-    cd ../
-    catkin config --cmake-args -DCMAKE_BUILD_TYPE=Release
-    catkin build
+    cd ..
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 
 ### Unit Tests
+
+**NOTE: This was not implemented in this fork.**
 
 Build tests with
     
@@ -120,6 +121,8 @@ Run the tests with
 In order to get the Robot-Centric Elevation Mapping to run with your robot, you will need to adapt a few parameters. It is the easiest if duplicate and adapt all the parameter files that you need to change from the `elevation_mapping_demos` package (e.g. the `simple_demo` example). These are specifically the parameter files in `config` and the launch file from the `launch` folder.
 
 ### TurtleBot3 Waffle Simulation
+
+**NOTE: This was not implemented in this fork.**
 
 A running example is provided, making use of the Turtlebot3 simulation environment. This example can be used to test elevation mapping, as a starting point for further integration.
 
@@ -140,6 +143,8 @@ Velocity inputs can be sent to the robot by pressing the keys `a`, `w`,`d`, `x`.
 
 ### Simple Demo & Ground Truth Demo
 
+**NOTE: This was not implemented in this fork.**
+
 A .ply is published as static pointcloud, elevation_mapping subscribes to it and publishes the elevation map. You can visualize it through rviz. 
 For visualization, select `/elevation_mapping/elevation_map_raw`. 
 
@@ -150,12 +155,12 @@ roslaunch elevation_mapping_demos ground_truth_demo.launch
 
 While ground truth demo estimates the height in map frame, simple demo sets up a more realistic deployment scenario. Here, the elevation_map is configured to track a base frame.
 To get started, we suggest to play around and also visualize other published topics, such as `/elevation_mapping/elevation_map_raw` and change the height layer to another layer, e.g `elevation_inpainted`.
+
 ## Nodes
 
 ### Node: elevation_mapping
 
 This is the main Robot-Centric Elevation Mapping node. It uses the distance sensor measurements and the pose and covariance of the robot to generate an elevation map with variance estimates.
-
 
 #### Subscribed Topics
 
@@ -176,32 +181,14 @@ This is the main Robot-Centric Elevation Mapping node. It uses the distance sens
 
 * **`elevation_map`** ([grid_map_msgs/GridMap])
 
-    The entire (fused) elevation map. It is published periodically (see `fused_map_publishing_rate` parameter) or after the `trigger_fusion` service is called.
+    The elevation map, layers include mainly elevation and variance.
 
-* **`elevation_map_raw`** ([grid_map_msgs/GridMap])
+* **`visibility_cleanup_map`** ([grid_map_msgs/GridMap])
 
-    The entire (raw) elevation map before the fusion step.
+    The cleaned-up elevation map obtained from ray-tracing, published only if `enable_visibility_cleanup` if set to `True`.
 
 
 #### Services
-
-* **`trigger_fusion`** ([std_srvs/Empty])
-
-    Trigger the fusing process for the entire elevation map and publish it. For example, you can trigger the map fusion step from the console with
-
-        rosservice call /elevation_mapping/trigger_fusion
-
-* **`get_submap`** ([grid_map_msgs/GetGridMap])
-
-    Get a fused elevation submap for a requested position and size. For example, you can get the fused elevation submap at position (-0.5, 0.0) and size (0.5, 1.2) described in the odom frame and save it to a text file form the console with
-
-        rosservice call -- /elevation_mapping/get_submap odom -0.5 0.0 0.5 1.2 []
-
-* **`get_raw_submap`** ([grid_map_msgs/GetGridMap])
-
-    Get a raw elevation submap for a requested position and size. For example, you can get the raw elevation submap at position (-0.5, 0.0) and size (0.5, 1.2) described in the odom frame and save it to a text file form the console with
-
-        rosservice call -- /elevation_mapping/get_raw_submap odom -0.5 0.0 0.5 1.2 []
 
 * **`clear_map`** ([std_srvs/Empty])
 
@@ -268,10 +255,6 @@ This is the main Robot-Centric Elevation Mapping node. It uses the distance sens
         rosservice call /elevation_mapping/enable_updates {}
 
 #### Parameters
-
-* **`DEPRECATED point_cloud_topic`** (string, default: "/points")
-
-    The name of the distance measurements topic. Use input_sources instead. 
     
 * **`input_sources`** (list of input sources, default: none)
 
@@ -295,19 +278,19 @@ This is the main Robot-Centric Elevation Mapping node. It uses the distance sens
     ```yaml
     input_sources: []
     ```
-* **`robot_pose_with_convariance_topic`** (string, default: "/robot_state/pose")
+* **`robot_odom_topic`** (string, default: "/odom")
 
-    The name of the robot pose and covariance topic.
+    The name of the robot odometry topic.
 
-* **`robot_base_frame_id`** (string, default: "/robot")
+* **`robot_base_frame_id`** (string, default: "base_link")
 
     The id of the robot base tf frame.
 
-* **`map_frame_id`** (string, default: "/map")
+* **`map_frame_id`** (string, default: "map")
 
     The id of the tf frame of the elevation map.
 
-* **`track_point_frame_id`** (string, default: "/robot")
+* **`track_point_frame_id`** (string, default: "base_link")
 
     The elevation map is moved along with the robot following a *track point*. This is the id of the tf frame in which the track point is defined.
 
@@ -315,21 +298,13 @@ This is the main Robot-Centric Elevation Mapping node. It uses the distance sens
 
     The elevation map is moved along with the robot following a *track point*. This is the position of the track point in the `track_point_frame_id`.
 
-* **`robot_pose_cache_size`** (int, default: 200, min: 0)
+* **`robot_odom_cache_size`** (int, default: 200, min: 0)
 
-    The size of the robot pose cache.
+    The size of the robot odom cache.
 
 * **`min_update_rate`** (double, default: 2.0)
 
     The mininum update rate (in Hz) at which the elevation map is updated either from new measurements or the robot pose estimates.
-
-* **`fused_map_publishing_rate`** (double, default: 1.0)
-
-    The rate for publishing the entire (fused) elevation map.
-
-* **`relocate_rate`** (double, default: 3.0)
-
-    The rate (in Hz) at which the elevation map is checked for relocation following the tracking point.
 
 * **`length_in_x`**, **`length_in_y`** (double, default: 1.5, min: 0.0)
 
@@ -376,37 +351,11 @@ This is the main Robot-Centric Elevation Mapping node. It uses the distance sens
 * **`enable_continuous_cleanup`** (bool, default: false)
 
     Enable/disable a continuous clean-up of the elevation map. If enabled, on arrival of each new sensor data the elevation map will be cleared and filled up only with the latest data from the sensor. When continuous clean-up is enabled, visibility clean-up will automatically be disabled since it is not needed in this case.
-    
-* **`num_callback_threads`** (int, default: 1, min: 1)
-    The number of threads to use for processing callbacks. More threads results in higher throughput, at cost of more resource usage. 
-
-* **`postprocessor_pipeline_name`** (string, default: postprocessor_pipeline)
-
-    The name of the pipeline to execute for postprocessing. It expects a pipeline configuration to be loaded in the private namespace of the node under this name. 
-    E.g.:
-    ```
-      <node pkg="elevation_mapping" type="elevation_mapping" name="elevation_mapping" output="screen">
-          ...
-          <rosparam command="load" file="$(find elevation_mapping_demos)/config/postprocessor_pipeline.yaml" />
-      </node>
-    ```
-    A pipeline is a grid_map_filter chain, see grid_map_demos/filters_demo.yaml and [ros / filters](http://wiki.ros.org/filters) for more information. 
-
-* **`postprocessor_num_threads`** (int, default: 1, min: 1)
-
-    The number of threads to use for asynchronous postprocessing. More threads results in higher throughput, at cost of more resource usage. 
 
 * **`scanning_duration`** (double, default: 1.0)
 
     The sensor's scanning duration (in s) which is used for the visibility cleanup. Set this roughly to the duration it takes between two consecutive full scans (e.g. 0.033 for a ToF camera with 30 Hz, or 3 s for a rotating laser scanner). Depending on how dense or sparse your scans are, increase or reduce the scanning duration. Smaller values lead to faster dynamic object removal and bigger values help to reduce faulty map cleanups.
 
-* **`sensor_cutoff_min_depth`**, **`sensor_cutoff_max_depth`** (double, default: 0.2, 2.0)
-
-    The minimum and maximum values for the length of the distance sensor measurements. Measurements outside this interval are ignored.
-
-* **`sensor_model_normal_factor_a`**, **`sensor_model_normal_factor_b`**, **`sensor_model_normal_factor_c`**, **`sensor_model_lateral_factor`** (double)
-
-    The data for the sensor noise model.
 
 ## Changelog
 
