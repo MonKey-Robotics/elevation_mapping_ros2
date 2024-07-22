@@ -21,7 +21,7 @@
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <geometry_msgs/msg/point_stamped.h>
 #include <tf2/LinearMath/Transform.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include "elevation_mapping/ElevationMap.hpp"
 #include "elevation_mapping/ElevationMapping.hpp"
@@ -232,7 +232,7 @@ namespace elevation_mapping
       }
     }
 
-    mapUpdateTimer_->cancel();
+    // mapUpdateTimer_->cancel();
 
     // Convert the sensor_msgs/PointCloud2 data to pcl/PointCloud.
     pcl::PCLPointCloud2 pcl_pc;
@@ -321,11 +321,12 @@ namespace elevation_mapping
       map_.publishRawElevationMap();
     }
 
-    mapUpdateTimer_->reset();
+    // mapUpdateTimer_->reset();
   }
 
   void ElevationMapping::mapUpdateTimerCallback()
   {
+    map_.publishRawElevationMap();
 
     if (!updatesEnabled_)
     {
@@ -341,6 +342,7 @@ namespace elevation_mapping
     { // there were updates from sensordata, no need to force an update.
       return;
     }
+
     rclcpp::Clock clock;
     RCLCPP_WARN_THROTTLE(nodeHandle_->get_logger(), clock, 5, "Elevation map is updated without data from the sensor. (Warning message is throttled, 5s.)");
 

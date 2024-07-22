@@ -24,30 +24,31 @@ bool Input::configure(std::string& inputSourceName, const std::string& sourceCon
   Parameters parameters;
 
   std::string sensorProcessorType;
+  std::string configNamespace = sourceConfigurationName + "." + inputSourceName;
 
-  nodeHandle_->declare_parameter(inputSourceName + ".type", "");
-  nodeHandle_->declare_parameter(inputSourceName + ".topic", "");
-  nodeHandle_->declare_parameter(inputSourceName + ".queue_size", 1);
-  nodeHandle_->declare_parameter(inputSourceName + ".publish_on_update", false);
-  nodeHandle_->declare_parameter(inputSourceName + ".sensor_processor.type", "");
+  nodeHandle_->declare_parameter(configNamespace + ".type", "");
+  nodeHandle_->declare_parameter(configNamespace + ".topic", "");
+  nodeHandle_->declare_parameter(configNamespace + ".queue_size", 1);
+  nodeHandle_->declare_parameter(configNamespace + ".publish_on_update", false);
+  nodeHandle_->declare_parameter(configNamespace + ".sensor_processor.type", "");
 
-  if (!nodeHandle_->get_parameter(inputSourceName + ".type", parameters.type_)){
+  if (!nodeHandle_->get_parameter(configNamespace + ".type", parameters.type_)){
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Could not configure input source %s because no type was given.", inputSourceName.c_str());
   }
 
-  if (!nodeHandle_->get_parameter(inputSourceName + ".topic", parameters.topic_)){
+  if (!nodeHandle_->get_parameter(configNamespace + ".topic", parameters.topic_)){
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Could not configure input source %s because no topic was given.", inputSourceName.c_str());
   }
 
-  if (!nodeHandle_->get_parameter(inputSourceName + ".queue_size", parameters.queueSize_)){
+  if (!nodeHandle_->get_parameter(configNamespace + ".queue_size", parameters.queueSize_)){
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Could not configure input source %s because no queue_size was given.", inputSourceName.c_str());
   }
 
-  if (!nodeHandle_->get_parameter(inputSourceName + ".publish_on_update", parameters.publishOnUpdate_)){
+  if (!nodeHandle_->get_parameter(configNamespace + ".publish_on_update", parameters.publishOnUpdate_)){
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Could not configure input source %s because no publish_on_update was given.", inputSourceName.c_str());
   }
 
-  if (!nodeHandle_->get_parameter(inputSourceName + ".sensor_processor.type", sensorProcessorType)){
+  if (!nodeHandle_->get_parameter(configNamespace + ".sensor_processor.type", sensorProcessorType)){
     RCLCPP_ERROR(nodeHandle_->get_logger(), "Could not configure input source %s because no sensor_processor was given.", inputSourceName.c_str());
   }
 
@@ -56,7 +57,7 @@ bool Input::configure(std::string& inputSourceName, const std::string& sourceCon
   parameters_.setData(parameters);
  
   // SensorProcessor
-  if (!configureSensorProcessor(inputSourceName, sensorProcessorType, generalSensorProcessorParameters)) {
+  if (!configureSensorProcessor(configNamespace, sensorProcessorType, generalSensorProcessorParameters)) {
     return false;
   }
 

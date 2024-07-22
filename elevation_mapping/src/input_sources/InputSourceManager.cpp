@@ -14,18 +14,19 @@ namespace elevation_mapping {
 InputSourceManager::InputSourceManager(const std::shared_ptr<rclcpp::Node>& nodeHandle) : nodeHandle_(nodeHandle) {}
 
 bool InputSourceManager::configureFromRos(const std::string& inputSourcesNamespace) {
-  nodeHandle_->declare_parameter(inputSourcesNamespace, std::vector<std::string>());
-
+  nodeHandle_->declare_parameter(inputSourcesNamespace + "_lists", std::vector<std::string>());
   // Configure the visualizations from a configuration stored on the parameter server.
-  std::vector<std::string> inputSourcesConfiguration = nodeHandle_->get_parameter(inputSourcesNamespace).as_string_array();
-  if (!nodeHandle_->get_parameter(inputSourcesNamespace, inputSourcesConfiguration)) {
-    RCLCPP_WARN(nodeHandle_->get_logger(),
-        "Could not load the input sources configuration from parameter\n "
-        "%s, are you sure it was pushed to the parameter server? Assuming\n "
-        "that you meant to leave it empty. Not subscribing to any inputs!\n",
-        inputSourcesNamespace.c_str());
-    return false;
-  }
+  std::vector<std::string> inputSourcesConfiguration = nodeHandle_->get_parameter(inputSourcesNamespace + "_lists").as_string_array();
+  
+  //TODO: Detect if input sources are available
+  // if (!nodeHandle_->get_parameter(inputSourcesNamespace, inputSourcesConfiguration)) {
+  //   RCLCPP_WARN(nodeHandle_->get_logger(),
+  //       "Could not load the input sources configuration from parameter\n "
+  //       "%s, are you sure it was pushed to the parameter server? Assuming\n "
+  //       "that you meant to leave it empty. Not subscribing to any inputs!\n",
+  //       inputSourcesNamespace.c_str());
+  //   return false;
+  // }
   return configure(inputSourcesConfiguration, inputSourcesNamespace);  
 }
 

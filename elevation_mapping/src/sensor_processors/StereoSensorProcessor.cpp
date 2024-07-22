@@ -92,6 +92,7 @@ bool StereoSensorProcessor::computeVariances(const PointCloudType::ConstPtr poin
     // Measurement distance.
     float measurementDistance = pointVector.norm();
 
+    // FIXME: getJ() not working
     // Compute sensor covariance matrix (Sigma_S) with sensor model.
     float varianceNormal =
         pow(sensorParameters_.at("depth_to_disparity_factor") / pow(disparity, 2), 2) *
